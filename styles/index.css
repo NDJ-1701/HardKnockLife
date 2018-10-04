@@ -1,0 +1,47 @@
+ThisIsJustAColorPickerForUtility {    color: #a81c1c    ;}
+
+body {
+  background-color: #808080;
+  background-image: url("images/simple-background.jpg");
+}
+h1 {
+  text-align: center;
+  color: #ff6a00;
+  font-size: larger;
+}
+p {
+  text-align: center;
+}
+.centerUs {
+  text-align: center;
+  margin: 0 auto; /*these two lines necessary to center element*/
+  display: block;
+}
+
+.scroll-box {
+  height: 90px;
+  width: 400px;
+  font-size: 78%;
+  overflow-y: scroll;
+  background: #dddddd;
+}
+#canvasStack{
+  position: relative;
+  width: 800px;
+  height: 600px;
+  
+  border: 4px solid #000000;
+
+  margin: 0 auto; /*these two lines necessary to center element*/
+  display: block;
+}
+
+canvas {
+  position: absolute;
+}
+#gameCanvas {
+  /* background-image: url("images/stone-bg-w-border.png"); */
+  background-size: 800px 600px;
+  background: url("images/background-clouds.jpg");
+  z-index: 0;
+}
