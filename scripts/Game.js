@@ -4,12 +4,16 @@ console.time("its");
 
     let cfg = {
         gridSize: 10, // 10 pixels per cell
-        tickRate: 250,
+        tickRate: 222,
         cellStyle: {
             bodyColor: 'black',
-            outlineColor: 'lightblue', // I only changed this for fun, but would prefer it to be clear. Can't remember how.
+            outlineColor: 'rgb(173, 216, 230)', //'lightblue'
+                // Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
+                // I only changed this for fun, but would prefer it to be clear. Can't remember how.
             outlineThick: 1
-        }
+        },
+        killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
+        opacityAging: true
     }
 
     //// Setup, Config, etc...
@@ -47,7 +51,18 @@ console.time("its");
         set matrix (dualArray) {
             this.x = dualArray[0];
             this.y = dualArray[1];
+        }, // these 4 methods and 4 props don't seem DRY, hmm.
+        xd: [],
+        yd: [],
+        get deadMatrix () {
+            return [this.xd, this.yd];
         },
+        set deadMatrix (dualArray) {
+            this.xd = dualArray[0];
+            this.yd = dualArray[1];
+        },
+        // if/when the multistage deadMatrices works i think i can just remove the above deadStuff
+        deadMatrices: [], // [ [[x],[y]], [[x],[y]] ] array of matrices, each of which contains an array of deadXs and an array of deadYs
         push: function (x, y) {
             if (x > 0 && y > 0 && x <= gridWidth && y <= gridHeight) { // i scout salute my fingers and swear to remove this when we have zoom
                 this.x.push(x);
@@ -180,18 +195,44 @@ console.time("its");
     }
 
     function drawState() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);        
+        if (cfg.killedFadeOut) {
+            for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
+                for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
+                    drawKilled(state.deadMatrices[m][0][i], state.deadMatrices[m][1][i], m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+                }
+            }
+        }
+        // if (cfg.drawKilled) { // drawKilled first so it will be covered up by living cells
+        //     for (let i = 0; i < state.xd.length; i++) { // xd, yd is the killedMatrix
+        //     drawKilled(state.xd[i], state.yd[i]);
+        //     }
+        // }
         for (let i = 0; i < state.x.length; i++) {
             drawOne(state.x[i], state.y[i]);
         }
-        console.log(state.x.length);
+        // console.log(state.x.length);
     }
 
-    function drawOne(x, y) {
-        ctx.fillStyle = cfg.cellStyle.outlineColor;
-        ctx.fillRect(x * cfg.gridSize, y * cfg.gridSize, cfg.gridSize, cfg.gridSize);
+    function drawOne (x, y) {
+        ctx.fillStyle = cfg.cellStyle.outlineColor; 
+        ctx.fillRect(x * cfg.gridSize, y * cfg.gridSize, cfg.gridSize, cfg.gridSize); // first fill entire square with outline color
         ctx.fillStyle = cfg.cellStyle.bodyColor;
         let w = cfg.cellStyle.outlineThick;
+        ctx.fillRect(x * cfg.gridSize + w, y * cfg.gridSize + w, cfg.gridSize - 2 * w, cfg.gridSize - 2 * w); // then fill smaller center square with body color
+    }
+
+    function drawKilled (x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
+        if (cfg.opacityAging) {
+            let opacity = ((1.2 / state.deadMatrices.length) * (m + 1.0)).toFixed(2); // equal fade spread across the aging matrices.
+                //Numerator above 1.0 keeps opacity higher for longer
+            //e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
+            let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
+            ctx.fillStyle = opaColor;
+        }
+        else
+            ctx.fillStyle = cfg.cellStyle.outlineColor;
+        let w = cfg.cellStyle.outlineThick; // draw body-sized square but with the other color
         ctx.fillRect(x * cfg.gridSize + w, y * cfg.gridSize + w, cfg.gridSize - 2 * w, cfg.gridSize - 2 * w);
     }
 
@@ -265,45 +306,68 @@ console.time("its");
 
     /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
     function stepState(steps = 1) {
-        let touched = [[], [], []]; //[[x],[y],[n]]  n = times touched
+        let touched = [[], [], [], []]; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
+        let killedMatrix = [[],[]];
         const newState = Object.create(defaultState);
         newState.matrix = [[], []];
         // determine which cells are neighbors to the specified cell, and increment their 'touched' counter
         function touch(xo, yo) {
             for (let y = yo - 1; y <= yo + 1; y++) {
                 for (let x = xo - 1; x <= xo + 1; x++) {
-                    if (x !== xo || y !== yo) {
                         let index = paraInd(x, y, touched[0], touched[1]);
-                        if (index === -1) {
+                        if (index === -1) { // if it's not in the touched list yet, add it
                             touched[0].push(x);
                             touched[1].push(y);
-                            touched[2].push(1);
+                            if (x !== xo || y !== yo) { // if it's a neighbor initialize with one touch and not alive
+                                touched[2].push(1);
+                                touched[3].push(false);
+                            } // this isn't super DRY, but It was confusing when I tried to combine them
+                            else { // if it's this cell itself, initialize with 0 touches and alive true
+                                touched[2].push(0);
+                                touched[3].push(true);
+                            }
                         }
                         else
-                            touched[2][index] += 1;
-                    }
+                            if (x !== xo || y !== yo) 
+                                touched[2][index] += 1; // iff it's a neighbor, increment the counter
+                            else 
+                                touched[3][index] = true; // iff it's the cell itself, make sure it's marked alive
                 }
             }
         }
-
-        for (let i = 0; i < state.x.length; i++) { // increment counter for each adjacent living cell
-            touch(state.x[i], state.y[i]);
+        
+        for (let i = 0; i < state.x.length; i++) {
+            touch(state.x[i], state.y[i]); // increment counter for each adjacent living cell
         }
         for (let i = 0; i < touched[0].length; i++) { // check the counter to see how many adjacent cells are living
             let x = touched[0][i];
             let y = touched[1][i];
-            let alive = -1 !== paraInd(x, y, state.x, state.y);
+            //let alive = -1 !== paraInd(x, y, state.x, state.y);
+            let alive = touched[3][i]; 
             if (!alive && touched[2][i] === 3) { // if it's dead and has the right number of living neighbors, bring it to life
                 newState.push(x, y);
             }
             else if (alive && 2 <= touched[2][i] && touched[2][i] <= 3) { // if it's alive and has the right number of living neighbors, keep it alive
                 newState.push(x, y);
             }
-        } // anything not explicitly added by above rules will be dead, because each step initializes the aliveList to an empty array
+            else if (alive) { // anything not explicitly added to newState by above rules will be dead, because each step initializes the aliveList to an empty array
+                killedMatrix[0].push(x);
+                killedMatrix[1].push(y);
+            }
+        } 
         if (steps > 1) {
             return stepState(--steps); // repeat
         }
 
+        // setting these props individually isn't really taking advantage of the multiple state objects
+        // we should probably be setting the properties of newstate in here and then replacing the entire state object
+
+        // indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
+        if (cfg.killedFadeOut) {
+            state.deadMatrices.push(killedMatrix);
+            if (state.deadMatrices.length > cfg.killedFadeOut)
+                state.deadMatrices.shift();
+        }
         state.matrix = newState.matrix;
     }
 
