@@ -2,11 +2,9 @@
     dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
     outlines should be made to be one pixel wide, or a configurable preference.
     at a certain cell size, the border should throw away cells or let them go off screen
-    screen should have a cell size lock and shift lock.
-    tickrate should be able to be set by user.
-    zoom in/out should be a user config feature.
-    a config should be added for husks vs shadows
-    a config button should be added for persistant husks/shadows.
+    zoom in/out should be a user config feature. (zoom should be mouse wheel, and should center zoomed in square)
+    user should be able to drag perspective
+    a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
     the ability to rewind/undo should be a toggle, as it is probably resource intensive.
 */
 
@@ -25,11 +23,13 @@ console.time("its");
                 // I only changed this for fun, but would prefer it to be clear. Can't remember how.
             outlineThick: 1
         },
-        husks: true, // whether to show full fading squares or only outlines for dead cells.
+        deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
         killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
         opacityAging: true,
         enableUndo: true,
-        maxUndo: 20
+        maxUndo: 20,
+        shiftLock: false,
+        cellSizeLock: false
     }
 
     //// Setup, Config, etc...
@@ -110,8 +110,10 @@ console.time("its");
             return (this.yMax - this.yMin);
         },
         resetShiftValues: function() {
-            this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
-            this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            if (!cfg.shiftLock){
+                this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
+                this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            }
         },
         checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
             if( (this.xShift === 0 && this.yShift === 0) ||
@@ -372,14 +374,16 @@ console.time("its");
 
         // set new cell size and shift value
         state.checkResetShiftValues();
-        if (!checkReduceCellSize())
+        if (!cfg.cellSizeLock && !checkReduceCellSize())
             checkIncreaseCellSize()
 
         // draw cells killed since last state
-        if (cfg.killedFadeOut) {
-            for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
-                for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
-                    drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+        if (cfg.deadCellType != 0){
+            if (cfg.killedFadeOut) {
+                for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
+                    for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
+                        drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+                    }
                 }
             }
         }
@@ -406,7 +410,7 @@ console.time("its");
 
     function drawDeadCell (x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
         let size = state.cellSize;
-        if (cfg.husks){
+        if (cfg.deadCellType == 2){ // husks
             ctx.beginPath();
             ctx.rect(x * size, y * size, size, size);
             switch (m){
@@ -423,7 +427,7 @@ console.time("its");
             ctx.lineWidth = 1;
             ctx.stroke()
         }
-        else {
+        else if (cfg.deadCellType == 1) { // shadows
             // this section needs to be changed in order to get better efficiency.
             if (cfg.opacityAging) {
                 let opacity = ((state.deadMatrices.length - m) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
@@ -447,18 +451,56 @@ console.time("its");
         if (running) // start stepping interval
         {
             button.innerText = "Stop";
-            drawState(stepState(1));
-            let runInterval = setInterval(() => {
-                if (running)
+
+            function recursingRepeater(){
+                if (running){
                     drawState(stepState(1));
-                else
-                    clearInterval(runInterval);
-            }, cfg.tickRate);
+                    window.setTimeout(recursingRepeater, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
+                }                    
+            };
+
+            window.setTimeout(recursingRepeater, cfg.tickRate);
         }
         else
             button.innerText = "Run";
     }
 
+    function slowRun(){
+        if (cfg.tickRate >= 37)
+            cfg.tickRate += 37;
+        else
+            cfg.tickRate += 10;
+    }
+
+    function speedRun(){
+        if (cfg.tickRate > 37)
+            cfg.tickRate -= 37;
+        else if (cfg.tickRate > 7){
+            cfg.tickRate -= 10;
+        }
+    }
+
+    function shiftLockToggle(){
+        let button = document.getElementById("shiftLockButton");
+        cfg.shiftLock = !cfg.shiftLock;
+        button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";        
+    }
+
+    function cellSizeLockToggle(){
+        let button = document.getElementById("cellSizeLockButton");
+        cfg.cellSizeLock = !cfg.cellSizeLock;
+        button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
+    }
+
+    function changeResidue(){
+        let button = document.getElementById("changeResidueButton");
+        if (cfg.deadCellType === 2)
+            cfg.deadCellType = 0;
+        else
+            cfg.deadCellType++;
+        // add text for NEXT cell type
+        button.innerText = (cfg.deadCellType === 0)? "Shadows" : (cfg.deadCellType === 1)? "Husks" : "Hide residues";
+    }
           
     /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
     function parseRLE (input, newState) { // http://www.conwaylife.com/wiki/Run_Length_Encoded
@@ -520,6 +562,7 @@ console.time("its");
     
     /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
     function stepState(steps = 1) {
+        
         if (cfg.enableUndo){
             if (oldStates.length > cfg.maxUndo){
                 oldStates.shift();
@@ -578,6 +621,8 @@ console.time("its");
             else if (alive) { // anything not explicitly added to newState by above rules will be dead, because each step initializes the aliveList to an empty array
                 killedMatrix[0].push(x);
                 killedMatrix[1].push(y);
+
+
             }
         } 
         if (steps > 1) {
