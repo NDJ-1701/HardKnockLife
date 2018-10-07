@@ -3,7 +3,6 @@
     outlines should be made to be one pixel wide, or a configurable preference.
     at a certain cell size, the border should throw away cells or let them go off screen
     screen should have a cell size lock and shift lock.
-    tickrate should be able to be set by user.
     zoom in/out should be a user config feature.
     a config should be added for husks vs shadows
     a config button should be added for persistant husks/shadows.
@@ -447,16 +446,33 @@ console.time("its");
         if (running) // start stepping interval
         {
             button.innerText = "Stop";
-            drawState(stepState(1));
-            let runInterval = setInterval(() => {
-                if (running)
+            
+            function recursingRepeater(){
+                if (running){
                     drawState(stepState(1));
-                else
-                    clearInterval(runInterval);
-            }, cfg.tickRate);
+                    window.setTimeout(recursingRepeater, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
+                }                    
+            };
+
+            window.setTimeout(recursingRepeater, cfg.tickRate);
         }
         else
             button.innerText = "Run";
+    }
+
+    function slowRun(){
+        if (cfg.tickRate >= 37)
+            cfg.tickRate += 37;
+        else
+            cfg.tickRate += 10;
+    }
+
+    function speedRun(){
+        if (cfg.tickRate > 37)
+            cfg.tickRate -= 37;
+        else if (cfg.tickRate > 7){
+            cfg.tickRate -= 10;
+        }
     }
 
           
@@ -520,6 +536,7 @@ console.time("its");
     
     /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
     function stepState(steps = 1) {
+        
         if (cfg.enableUndo){
             if (oldStates.length > cfg.maxUndo){
                 oldStates.shift();
@@ -578,6 +595,8 @@ console.time("its");
             else if (alive) { // anything not explicitly added to newState by above rules will be dead, because each step initializes the aliveList to an empty array
                 killedMatrix[0].push(x);
                 killedMatrix[1].push(y);
+
+
             }
         } 
         if (steps > 1) {
