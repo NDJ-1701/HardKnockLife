@@ -520,7 +520,6 @@ console.time("its");
     
     /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
     function stepState(steps = 1) {
-        
         if (cfg.enableUndo){
             if (oldStates.length > cfg.maxUndo){
                 oldStates.shift();
@@ -579,8 +578,6 @@ console.time("its");
             else if (alive) { // anything not explicitly added to newState by above rules will be dead, because each step initializes the aliveList to an empty array
                 killedMatrix[0].push(x);
                 killedMatrix[1].push(y);
-
-
             }
         } 
         if (steps > 1) {
