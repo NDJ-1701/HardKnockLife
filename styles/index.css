@@ -44,4 +44,5 @@ canvas {
   background-size: 800px 600px;
   background: url("images/background-clouds.jpg");
   z-index: 0;
+  margin: 0;
 }

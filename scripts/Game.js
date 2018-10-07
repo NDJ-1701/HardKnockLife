@@ -1,9 +1,22 @@
+/* desired improvements:
+    dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
+    outlines should be made to be one pixel wide, or a configurable preference.
+    at a certain cell size, the border should throw away cells or let them go off screen
+    screen should have a cell size lock and shift lock.
+    tickrate should be able to be set by user.
+    zoom in/out should be a user config feature.
+    a config should be added for husks vs shadows
+    a config button should be added for persistant husks/shadows.
+    the ability to rewind/undo should be a toggle, as it is probably resource intensive.
+*/
+
 ////// Conway's game of life
 console.time("its");
 { // Um, is that block really all I have to do to scope all my variables.?
 
     let cfg = {
-        gridSize: 10, // 10 pixels per cell
+        initialCellSize: 10, // 10 pixels per cell
+        maximumCellSize: 16,
         tickRate: 222,
         cellStyle: {
             bodyColor: 'black',
@@ -12,89 +25,208 @@ console.time("its");
                 // I only changed this for fun, but would prefer it to be clear. Can't remember how.
             outlineThick: 1
         },
+        husks: true, // whether to show full fading squares or only outlines for dead cells.
         killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
-        opacityAging: true
+        opacityAging: true,
+        enableUndo: true,
+        maxUndo: 20
     }
 
     //// Setup, Config, etc...
     let canvas = document.getElementById("gameCanvas");
+
+    var container = document.getElementById( 'canvas' );
     let ctx = canvas.getContext("2d");
-    canvas.addEventListener("mousedown", getCursorPosition, false);
+    canvas.addEventListener("mousedown", addCellAtCursorPosition, false);
     let gridWidth = canvas.width / cfg.gridSize;
     let gridHeight = canvas.height / cfg.gridSize;
+    let oldStates = [];
 
     let running = false;
 
     //// Setup for testing...
+    let aCoupleDots = [[10,10,11,11],[10,11,10,11]]
     let gosperGliderGun =
         [[14, 14, 15, 15, 24, 24, 24, 25, 26, 27, 25, 26, 27, 29, 30, 30, 30, 31, 29, 28, 34, 34, 34, 35, 35, 35, 36, 36, 38, 38, 38, 38, 48, 49, 49, 48],
-        [21, 22, 22, 21, 21, 22, 23, 20, 19, 19, 24, 25, 25, 24, 23, 22, 21, 22, 20, 22, 21, 20, 19, 19, 20, 21, 18, 22, 17, 18, 22, 23, 20, 20, 19, 19]];
+        [ 21, 22, 22, 21, 21, 22, 23, 20, 19, 19, 24, 25, 25, 24, 23, 22, 21, 22, 20, 22, 21, 20, 19, 19, 20, 21, 18, 22, 17, 18, 22, 23, 20, 20, 19, 19]];
+
     // includes gosper glider gun, figure 8 oscillator, and pulsar.
+    let variousInitialStateComments = `#N Various Initial States <br> 
+    #O NaOH <br>
+    #C Includes gosper glider gun, figure 8 oscillator, and pulsar.`;
     let variousInitialState =
         [[14, 14, 15, 15, 24, 24, 26, 28, 28, 24, 24, 28, 28, 24, 26, 29, 35, 37, 37, 36, 36, 39, 40, 37, 40, 36, 36, 36, 37, 40, 39, 40, 44, 44, 48, 46, 47, 48, 45, 43, 45, 49, 49, 16, 15, 17, 18, 18, 18, 15, 16, 17, 13, 13, 13, 21, 23, 22, 20, 20, 20, 21, 22, 23, 25, 25, 25, 15, 17, 16, 18, 18, 18, 13, 13, 13, 15, 16, 17, 22, 20, 21, 23, 20, 20, 25, 25, 25, 21, 22, 23, 69, 70, 68, 71, 72, 67, 66, 73, 74, 66, 74, 67, 73, 68, 72, 69, 70, 71, 63, 62, 63, 62, 64, 64, 62, 63, 64, 65, 66, 67, 65, 65, 67, 66, 67, 66],
-        [21, 22, 22, 21, 20, 19, 19, 20, 21, 22, 24, 23, 24, 25, 25, 22, 25, 25, 26, 27, 26, 17, 18, 18, 17, 19, 20, 21, 22, 22, 23, 23, 19, 21, 18, 21, 21, 21, 19, 20, 21, 19, 20, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 43, 42, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 42, 43, 46, 46, 46, 48, 47, 49, 47, 49, 48, 51, 51, 51, 46, 47, 46, 46, 49, 48, 47, 48, 49, 51, 51, 51, 34, 34, 35, 34, 35, 36, 38, 36, 38, 39, 39, 41, 41, 42, 42, 43, 43, 43, 7, 8, 8, 7, 7, 8, 9, 9, 9, 10, 10, 10, 11, 12, 11, 12, 12, 11]];
+        [ 21, 22, 22, 21, 20, 19, 19, 20, 21, 22, 24, 23, 24, 25, 25, 22, 25, 25, 26, 27, 26, 17, 18, 18, 17, 19, 20, 21, 22, 22, 23, 23, 19, 21, 18, 21, 21, 21, 19, 20, 21, 19, 20, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 43, 42, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 42, 43, 46, 46, 46, 48, 47, 49, 47, 49, 48, 51, 51, 51, 46, 47, 46, 46, 49, 48, 47, 48, 49, 51, 51, 51, 34, 34, 35, 34, 35, 36, 38, 36, 38, 39, 39, 41, 41, 42, 42, 43, 43, 43,  7,  8,  8,  7,  7,  8,  9,  9,  9, 10, 10, 10, 11, 12, 11, 12, 12, 11]];
 
-    const defaultState = {
-        // comments use explicit <br> between lines because they are being displayed as html
-        comments: `#N Various Initial States <br> 
-            #O NaOH <br>
-            #C Includes gosper glider gun, figure 8 oscillator, and pulsar.`,
+    let fourLightSpaceships =
+            [[ 5,  5,  5,  6,  6,  7,  8,  9,  9, 41, 41, 41, 41, 40, 39, 38, 40, 38, 69, 70, 71, 72, 72, 72, 71, 68, 68, 42, 42, 42, 42, 41, 40, 39, 41, 39],
+            [ 26, 27, 28, 29, 26, 26, 26, 27, 29,  4,  5,  6,  7,  4,  4,  5,  8,  8, 27, 27, 27, 27, 28, 29, 30, 28, 30, 52, 53, 54, 55, 55, 55, 54, 51, 51]];
+
+    
+    let initialSetupComments = variousInitialStateComments;
+    let initialSetup = variousInitialState;
+    let empty = [];
+
+
+
+    const StateProtoType = {
+        cellSize: cfg.initialCellSize,
+        gridWidth: Math.floor(canvas.width / cfg.initialCellSize),
+        gridHeight: Math.floor(canvas.height / cfg.initialCellSize),
+        xShift: 0,
+        yShift: 0,
+        refreshMinMaxes: function(){
+            this.xMin = Math.min(...this.x);
+            this.xMax = Math.max(...this.x);
+            this.yMin = Math.min(...this.y);
+            this.yMax = Math.max(...this.y);
+        },
+        printComments: function () {
+            document.getElementById('comments').innerHTML = this.comments;
+        },
         setComments: function (htmlString) {
             this.comments = htmlString;
-            document.getElementById('comments').innerHTML = state.comments;
+            this.printComments();
         },
-        x: variousInitialState[0],
-        y: variousInitialState[1],
-        get matrix () {
-            return [this.x, this.y];
+        init: function(initialMatrix, initialComments){
+            this.setComments(initialComments);
+            this.matrix = initialMatrix;
+            // this.xMin = Math.min(...initialSetup[0]);
+            // this.xMax = Math.max(...initialSetup[0]);
+            // this.yMin = Math.min(...initialSetup[1]);
+            // this.yMax = Math.max(...initialSetup[1]);
+            this.refreshMinMaxes();
+            this.resetShiftValues();
+            this.deadMatrices = [];
+            this.cellSize = cfg.initialCellSize;
+            this.gridWidth = Math.floor(canvas.width / cfg.initialCellSize);
+            this.gridHeight = Math.floor(canvas.height / cfg.initialCellSize);
+            this.save();
         },
-        set matrix (dualArray) {
-            this.x = dualArray[0];
-            this.y = dualArray[1];
-        }, // these 4 methods and 4 props don't seem DRY, hmm.
-        xd: [],
-        yd: [],
-        get deadMatrix () {
-            return [this.xd, this.yd];
+        get cellsWide() {
+            return (this.xMax - this.xMin);
         },
-        set deadMatrix (dualArray) {
-            this.xd = dualArray[0];
-            this.yd = dualArray[1];
+        get cellsTall() {
+            return (this.yMax - this.yMin);
         },
-        // if/when the multistage deadMatrices works i think i can just remove the above deadStuff
-        deadMatrices: [], // [ [[x],[y]], [[x],[y]] ] array of matrices, each of which contains an array of deadXs and an array of deadYs
-        push: function (x, y) {
-            if (x > 0 && y > 0 && x <= gridWidth && y <= gridHeight) { // i scout salute my fingers and swear to remove this when we have zoom
-                this.x.push(x);
-                this.y.push(y);
+        resetShiftValues: function() {
+            this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
+            this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+        },
+        checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
+            if( (this.xShift === 0 && this.yShift === 0) ||
+                (this.xMin + this.xShift) < 0 ||
+                (this.xMax + this.xShift) > this.gridWidth ||
+                (this.yMin + this.yShift) < 0 ||
+                (this.yMax + this.yShift) > this.gridHeight){
+                this.resetShiftValues();
             }
         },
-        remove: function (index) {
+        get matrix() {
+            return [this.x, this.y];
+        },
+        set matrix(dualArray) {
+            this.x = dualArray[0].slice();
+            this.y = dualArray[1].slice();
+        },
+        // get deadMatrix () {
+        //     return [this.xDead, this.yDead];
+        // },
+        // set deadMatrix (dualArray) {
+        //     this.xDead = dualArray[0];
+        //     this.yDead = dualArray[1];
+        // },
+        push: function(x, y) { // adds and xy pair and sets mins and maxes if necessary.
+            //if (x > 0 && y > 0 && x <= this.gridWidth && y <= this.gridHeight) { // i scout salute my fingers and swear to remove this when we have zoom
+                this.x.push(x);
+                this.y.push(y);
+            //}
+            if (x < this.xMin || (this.xMin === undefined))
+                this.xMin = x;
+            if (x > this.xMax || (this.xMax === undefined))
+                this.xMax = x;
+            if (y < this.yMin || (this.yMin === undefined))
+                this.yMin = y;
+            if (y > this.yMax || (this.yMax === undefined))
+                this.yMax = y;
+        },
+        privateSpliceAtIndex: function(index) { // removes an xy pair at index. This function should only be used by the following "remove" function
             this.x.splice(index, 1);
             this.y.splice(index, 1);
+        },
+        remove: function(index) { // removes an xy pair at index, and sets mins and maxes if necessary.
+            if (this.x[index] === this.xMin) {
+                this.privateSpliceAtIndex(index);
+                this.xMin = Math.min(...this.x);
+            }
+            else if (this.x[index] === this.xMax) {
+                this.privateSpliceAtIndex(index);
+                this.xMax = Math.max(...this.x);
+            }
+            else if (this.y[index] === this.yMin) {
+                this.privateSpliceAtIndex(index);
+                this.yMin = Math.min(...this.y);
+            }
+            else if (this.y[index] === this.yMax) {
+                this.privateSpliceAtIndex(index);
+                this.yMax = Math.max(...this.y);
+            }
+            else {
+                this.privateSpliceAtIndex(index);
+            }
+        },
+        get minMaxes() {
+            return [this.xMin, this.xMax, this.yMin, this.yMax];
+        },
+        set minMaxes(args) {
+            this.xMin = args[0];
+            this.xMax = args[1];
+            this.yMin = args[2];
+            this.yMax = args[3];
+        },
+        changeCellSizeTo: function(newSize) {
+            this.cellSize = newSize;
+            this.gridWidth = Math.floor(canvas.width / this.cellSize);
+            this.gridHeight = Math.floor(canvas.height / this.cellSize);
+            this.resetShiftValues();
         },
         save: function () {
             this.saved = JSON.stringify(this.matrix);
         },
         reset: function () {
             this.matrix = JSON.parse(this.saved);
-            document.getElementById('comments').innerHTML = state.comments;
+            this.deadMatrices = [];
+            this.refreshMinMaxes();
+            // this.printComments(); shouldn't be necessary, comments should already be there.
         }
-    }; // Above is the object literal version of "State" we've been using, just renamed to "defaultState"
+    };
 
-    function State () {
-        // implicitly: let this = State.prototype || {};
-        this.save();
-        document.getElementById('comments').innerHTML = this.comments;
-        // implicitly: return this;
+    function State(initialize = false){
+        let s = Object.create(StateProtoType);
+
+        s.comments = ''; // this should be an html string
+        //this.x = initialSetup[0].slice();
+        //this.y = initialSetup[1].slice();
+        s.x = [];
+        s.y = [];
+        // s.xDead = [];
+        // s.yDead = [];
+        s.deadMatrices = [];
+        s.xMin;
+        s.xMax;
+        s.yMin;
+        s.yMax;
+
+        if (initialize)
+            s.init(initialSetup, initialSetupComments);
+        
+        s.save();
+        return s;
     }
-    State.prototype = defaultState;  // set the object that "new" should use instead of an empty object {}
-        // Yes, changes to defaultState will be applied immediately to all states (that's a useful feature) 
-        // and changes to any particular state do not apply to others (as expected)
 
     //// Game flow starts here...
     // let state = Object.create(State);
-    let state = new State();
+    let state = new State(true);
     // state.save(); // These two lines could be done in the constructor if we used the "new" syntax instead
     // document.getElementById('comments').innerHTML = state.comments; // They have to be somewhere after state is created. 
     drawState();
@@ -122,18 +254,26 @@ console.time("its");
         return -1;
     }
 
-    function getCursorPosition(event) {
+    function addCellAtCursorPosition(event) {
         const rect = canvas.getBoundingClientRect(); // needs to be here because canvas can move if window is resized or scrolled.
 
-        // get mouse click location relative to canvas
-        let x = event.clientX - rect.left - 5; // integer mouse cursor tip offset
-        x = Math.round(x / cfg.gridSize);
-        let y = event.clientY - rect.top - 4; // integer mouse cursor tip offset
-        y = Math.round(y / cfg.gridSize);
+        //let x = event.clientX - canvas.offsetLeft;// - rect.offsetLeft;
+        //let y = event.clientY - canvas.offsetTop;// - rect.offsetTop;
+        console.log('event x', event.clientX);
+        console.log('offsetleft', canvas.offsetLeft);
+        console.log('rect left', rect.left);
+        console.log('client - left', event.clientX - rect.left);
+        console.log('client - canvasleft', event.clientX - canvas.offsetLeft);
 
-        let index = paraInd(x, y, state.x, state.y); // check if cell exists in state matrix
+        // get mouse click location relative to canvas
+        let x = event.clientX - rect.left; // integer mouse cursor tip offset
+        x = Math.floor(x / state.cellSize);
+        let y = event.clientY - rect.top; // integer mouse cursor tip offset
+        y = Math.floor(y / state.cellSize);
+
+        let index = paraInd(x - state.xShift, y - state.yShift, state.x, state.y); // check if cell exists in state matrix
         if (index === -1) { // if not found, add the cell to the state
-            state.push(x, y);
+            state.push(x - state.xShift, y - state.yShift);
         }
         else { // if found, delete the cell
             state.remove(index);
@@ -143,27 +283,38 @@ console.time("its");
         drawState();
     }
 
+    //// these functions could be moved into StatePrototype
+    //
     function clearState() {
         state.matrix = [[], []];
-        document.getElementById('comments').innerHTML = `#N Blank Canvas <br>
-            #O Your boundless imagination <br>
-            #C ... ... ...`;
+        state.deadMatrices = [];
+        state.minMaxes = [undefined, undefined, undefined, undefined];
+        //state.xShift = 0;
+        //state.yShift = 0;
         drawState();
     }
-
+    //
     function resetState() {
+        console.log('pre reset', state);
+        //state.init(); // Max used the reset function instead
         state.reset();
+        console.log('post reset', state);
         drawState();
     }
-
+    //
     function saveState () { // state.save() can't be called in the html button onclick because all these variables are intentionally block scoped. Though I don't really understand why the functions aren't scoped out also.
         state.save();
-        state.comments = "SavePoint of:  " + document.getElementById('comments').innerHTML;
-        document.getElementById('comments').innerHTML = state.comments;
+        state.setComments("SavePoint of:  " + document.getElementById('comments').innerHTML)
     }
+    ////
 
     function loadPattern () {
-        state.matrix = parseRLE(patternsArray[getRandomInt(patternsArray.length - 1)]);
+        clearState();
+        const newState = new State();
+        parseRLE(patternsArray[getRandomInt(patternsArray.length - 1)], newState);
+        state.init(newState.matrix);
+        state.setComments(newState.comments);
+        console.log('loaded matrix', state.matrix);
         state.save();
         drawState();
     }
@@ -172,68 +323,120 @@ console.time("its");
     function random() {
         let xResult = [];
         let yResult = [];
-        let lesserator = Math.random() / 2; // randomly reduces the likelihood of creating a cell. Set equal to 1 if you always want an empty border.
-        let margin = getRandomInt(30); // number of cells into the grid to apply the lesserator
+        let lesserator = 1; //Math.random() / 2; // randomly reduces the likelihood of creating a cell. Set equal to 1 if you always want an empty border.
+        let margin = 6;//getRandomInt(30); // number of cells into the grid to apply the lesserator
         // iterate through each possible cell, and if randomly true, build the new state arrays.
-        for (let i = 0; i < gridWidth; i++) {
-            for (let e = 0; e < gridHeight; e++) {
-                let modifier = (i < margin || i > (gridWidth - margin) || e < margin || e > (gridHeight - margin)) ? lesserator : 0; // only apply lesserator if within the margin
+        for (let i = 0; i < state.gridWidth; i++) {
+            for (let e = 0; e < state.gridHeight; e++) {
+                let modifier = (i < margin || i >= (state.gridWidth - margin) || e < margin || e >= (state.gridHeight - margin)) ? lesserator : 0; // only apply lesserator if within the margin
                 if ((Math.random() + modifier) < 0.5) {
-                    xResult.push(i);
-                    yResult.push(e);
+                    xResult.push(i - state.xShift);
+                    yResult.push(e - state.yShift);
                 }
             }
         }
 
         // save new state and draw it.
-        state.matrix = [xResult, yResult];
-        state.setComments(`#N Ordered Chaos <br>
-            #O Maths <br>
-            #C ... ... ...`);
-        state.save();
+        state.init([xResult, yResult],`#N Ordered Chaos <br>
+        #O Maths <br>
+        #C ... ... ...`);
         drawState();
     }
 
+
+
+    function checkReduceCellSize(decreased = false) {
+        if ((state.cellSize >= 2) && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight)) {
+            // if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
+
+            state.changeCellSizeTo(state.cellSize / 2);
+            return checkReduceCellSize(true);
+        }
+        return decreased;
+    }
+
+    function checkIncreaseCellSize(increased = false) {
+        if ((state.cellSize <= cfg.maximumCellSize) &&
+        (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize))/2) - 5)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize ))/2) - 5)))) {
+            // if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
+            state.changeCellSizeTo(state.cellSize * 2);
+            return checkIncreaseCellSize(true);
+        }
+        return increased;
+    }
+
+    // Library of custom functions...
     function drawState() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);        
+        // erase last canvas/cells.
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // set new cell size and shift value
+        state.checkResetShiftValues();
+        if (!checkReduceCellSize())
+            checkIncreaseCellSize()
+
+        // draw cells killed since last state
         if (cfg.killedFadeOut) {
             for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
                 for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
-                    drawKilled(state.deadMatrices[m][0][i], state.deadMatrices[m][1][i], m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+                    drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
                 }
             }
         }
-        // if (cfg.drawKilled) { // drawKilled first so it will be covered up by living cells
-        //     for (let i = 0; i < state.xd.length; i++) { // xd, yd is the killedMatrix
-        //     drawKilled(state.xd[i], state.yd[i]);
-        //     }
-        // }
-        for (let i = 0; i < state.x.length; i++) {
-            drawOne(state.x[i], state.y[i]);
+
+        for (let i = 0; i < state.x.length; i++) { // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
+            drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
         }
-        // console.log(state.x.length);
     }
 
-    function drawOne (x, y) {
-        ctx.fillStyle = cfg.cellStyle.outlineColor; 
-        ctx.fillRect(x * cfg.gridSize, y * cfg.gridSize, cfg.gridSize, cfg.gridSize); // first fill entire square with outline color
-        ctx.fillStyle = cfg.cellStyle.bodyColor;
-        let w = cfg.cellStyle.outlineThick;
-        ctx.fillRect(x * cfg.gridSize + w, y * cfg.gridSize + w, cfg.gridSize - 2 * w, cfg.gridSize - 2 * w); // then fill smaller center square with body color
-    }
-
-    function drawKilled (x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
-        if (cfg.opacityAging) {
-            let opacity = ((1.2 / state.deadMatrices.length) * (m + 1.0)).toFixed(2); // equal fade spread across the aging matrices.
-                //Numerator above 1.0 keeps opacity higher for longer
-            //e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
-            let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
-            ctx.fillStyle = opaColor;
-        }
-        else
+    function drawLiveCell(x, y) { // not sure if passing in an integer (cellsize) creates a copy. May be more efficient to refer to state.cellSize each time.
+        let size = state.cellSize;
+        if (size > 4) { // for large cells, use a bordered cell.
             ctx.fillStyle = cfg.cellStyle.outlineColor;
-        let w = cfg.cellStyle.outlineThick; // draw body-sized square but with the other color
-        ctx.fillRect(x * cfg.gridSize + w, y * cfg.gridSize + w, cfg.gridSize - 2 * w, cfg.gridSize - 2 * w);
+            ctx.fillRect(x * size, y * size, size, size);
+            ctx.fillStyle = cfg.cellStyle.bodyColor;
+            let w = cfg.cellStyle.outlineThick;
+            ctx.fillRect(x * size + w, y * size + w, size - 2 * w, size - 2 * w);
+        }
+        else{ // for small cells, fill entire cell with body color (no outline, grid space)
+            ctx.fillStyle = cfg.cellStyle.bodyColor;
+            ctx.fillRect(x * size, y * size, size, size);
+        }
+    }
+
+    function drawDeadCell (x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
+        let size = state.cellSize;
+        if (cfg.husks){
+            ctx.beginPath();
+            ctx.rect(x * size, y * size, size, size);
+            switch (m){
+                case 0:
+                ctx.strokeStyle = "#00000050"; break;
+                case 1:
+                ctx.strokeStyle = "#00000010"; break;
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                ctx.strokeStyle = "#00000002"; break;
+            }
+            ctx.lineWidth = 1;
+            ctx.stroke()
+        }
+        else {
+            // this section needs to be changed in order to get better efficiency.
+            if (cfg.opacityAging) {
+                let opacity = ((state.deadMatrices.length - m) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
+                    //Numerator above 1.0 keeps opacity higher for longer
+                //e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
+                let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
+                ctx.fillStyle = opaColor;
+            }
+            else
+                ctx.fillStyle = cfg.cellStyle.outlineColor;
+            let w = cfg.cellStyle.outlineThick; // draw body-sized square but with the other color
+            ctx.fillRect(x * size + w, y * size + w, size - 2 * w, size - 2 * w);
+        }
     }
 
     /// infinitely run the interval stepper until user clicks stop
@@ -255,15 +458,16 @@ console.time("its");
         else
             button.innerText = "Run";
     }
-      
-    /// given the text contents of an RLE file: output Xs[] and Ys[]
-    function parseRLE (input) { // http://www.conwaylife.com/wiki/Run_Length_Encoded
+
+          
+    /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
+    function parseRLE (input, newState) { // http://www.conwaylife.com/wiki/Run_Length_Encoded
         let lines = input.split(/\s*\r?\n\s*/); // array of lines with leading and trailing whitespace removed
         let commentLines = lines.filter(line=> /^(#|x)/i.test(line));
         function concatAndLinks(accum, curr) {
             return accum.concat("<br>", curr.replace(/(http:\/\/|www\.)(conwaylife\.com\S*)/, '<a href="http://www.$2">www.$2</a>'));
         }
-        state.setComments(commentLines.reduce(concatAndLinks));
+        newState.comments = commentLines.reduce(concatAndLinks);
         let width;
         let height;
         commentLines[commentLines.length - 1].replace(/x\s*=\s*(\d+).*y\s*=\s*(\d+)/, (m, p1, p2)=> { // grab the pattern's dimensions to calc offset
@@ -272,10 +476,10 @@ console.time("its");
             height = p2;
             // return m; Not actually using replace functionality here, just needed access to p1, p2
         });
-        let xOffset = Math.floor((canvas.width / 2) / cfg.gridSize - width / 2); // offset so that pattern draws in the middle of canvas
-        let yOffset = Math.floor((canvas.height / 2) / cfg.gridSize - height / 2);
+        //let xOffset = Math.floor((canvas.width / 2) / cfg.gridSize - width / 2); // offset so that pattern draws in the middle of canvas
+        //let yOffset = Math.floor((canvas.height / 2) / cfg.gridSize - height / 2);
         let codedLines = lines.filter(line=> !/^(#|x)/i.test(line)); // keep everything except comment lines and the header line
-        let matrix = [[],[]];
+        //let matrix = [[],[]];
         let x = 0;
         let y = 0;
         for (let i = 0; i < codedLines.length; i++) { // loop through the lines pushing live cells and skipping dead ones
@@ -285,8 +489,9 @@ console.time("its");
                 while (p1-- > 0) {
                     switch (p2) {
                     case 'o': // if it's alive, push it and move on
-                        matrix[0].push(x + xOffset);
-                        matrix[1].push(y + yOffset);
+                        //matrix[0].push(x + xOffset);
+                        //matrix[1].push(y + yOffset);
+                        newState.push(x,y);
                         x++;  break;
                     case 'b': // if it's dead, do nothing but move on
                         x++;  break;
@@ -301,15 +506,35 @@ console.time("its");
                 }
             });
         }
-        return matrix;
     }
 
+    function stepBack(){
+        if (oldStates.length > 0){
+            let lastState = oldStates.pop();
+            state.init(lastState.matrix, lastState.comments);
+            state.xShift = lastState.xShift;
+            state.yShift = lastState.yShift;
+            drawState();
+        }
+    }
+    
     /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
     function stepState(steps = 1) {
+        if (cfg.enableUndo){
+            if (oldStates.length > cfg.maxUndo){
+                oldStates.shift();
+            }
+            let oldState = new State();
+            oldState.init(state.matrix, state.comments);
+            oldState.xShift = state.xShift;
+            oldState.yShift = state.yShift;
+            oldStates.push(oldState);
+        }
+
         let touched = [[], [], [], []]; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
         let killedMatrix = [[],[]];
-        const newState = Object.create(defaultState);
-        newState.matrix = [[], []];
+        const newState = new State();
+        let bounds = { xmin: state.xMin, xmax: state.xMax, ymin: state.yMin, ymax: state.yMax };
         // determine which cells are neighbors to the specified cell, and increment their 'touched' counter
         function touch(xo, yo) {
             for (let y = yo - 1; y <= yo + 1; y++) {
@@ -319,7 +544,7 @@ console.time("its");
                             touched[0].push(x);
                             touched[1].push(y);
                             if (x !== xo || y !== yo) { // if it's a neighbor initialize with one touch and not alive
-                                touched[2].push(1);
+                            touched[2].push(1);
                                 touched[3].push(false);
                             } // this isn't super DRY, but It was confusing when I tried to combine them
                             else { // if it's this cell itself, initialize with 0 touches and alive true
@@ -335,7 +560,7 @@ console.time("its");
                 }
             }
         }
-        
+
         for (let i = 0; i < state.x.length; i++) {
             touch(state.x[i], state.y[i]); // increment counter for each adjacent living cell
         }
@@ -364,11 +589,12 @@ console.time("its");
 
         // indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
         if (cfg.killedFadeOut) {
-            state.deadMatrices.push(killedMatrix);
+            state.deadMatrices.unshift(killedMatrix);
             if (state.deadMatrices.length > cfg.killedFadeOut)
-                state.deadMatrices.shift();
+                state.deadMatrices.pop();
         }
         state.matrix = newState.matrix;
+        state.minMaxes = newState.minMaxes;
     }
 
 } // Um, is that block really all I have to do to scope all my variables.?
