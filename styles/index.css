@@ -14,12 +14,21 @@ p {
 }
 .centerUs {
   text-align: center;
+  margin: 0 auto; /*these two lines necessary to center element*/
+  display: block;
 }
 
+.scroll-box {
+  height: 90px;
+  width: 400px;
+  font-size: 78%;
+  overflow-y: scroll;
+  background: #dddddd;
+}
 #canvasStack{
   position: relative;
-  width: 900px;
-  height: 700px;
+  width: 800px;
+  height: 600px;
   
   border: 4px solid #000000;
 
@@ -32,7 +41,8 @@ canvas {
 }
 #gameCanvas {
   /* background-image: url("images/stone-bg-w-border.png"); */
-  background-size: 900px 700px;
+  background-size: 800px 600px;
   background: url("images/background-clouds.jpg");
   z-index: 0;
+  margin: 0;
 }
