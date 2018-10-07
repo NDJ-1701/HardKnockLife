@@ -28,7 +28,9 @@ console.time("its");
         killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
         opacityAging: true,
         enableUndo: true,
-        maxUndo: 20
+        maxUndo: 20,
+        shiftLock: false,
+        cellSizeLock: false
     }
 
     //// Setup, Config, etc...
@@ -109,8 +111,10 @@ console.time("its");
             return (this.yMax - this.yMin);
         },
         resetShiftValues: function() {
-            this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
-            this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            if (!cfg.shiftLock){
+                this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
+                this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            }
         },
         checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
             if( (this.xShift === 0 && this.yShift === 0) ||
@@ -371,7 +375,7 @@ console.time("its");
 
         // set new cell size and shift value
         state.checkResetShiftValues();
-        if (!checkReduceCellSize())
+        if (!cfg.cellSizeLock && !checkReduceCellSize())
             checkIncreaseCellSize()
 
         // draw cells killed since last state
@@ -446,7 +450,7 @@ console.time("its");
         if (running) // start stepping interval
         {
             button.innerText = "Stop";
-            
+
             function recursingRepeater(){
                 if (running){
                     drawState(stepState(1));
@@ -475,6 +479,17 @@ console.time("its");
         }
     }
 
+    function shiftLockToggle(){
+        let button = document.getElementById("shiftLockButton");
+        cfg.shiftLock = !cfg.shiftLock;
+        button.innerText = (cfg.shiftLock)? "(X) Toggle perspective lock" : "( ) Toggle perspective lock";        
+    }
+
+    function cellSizeLockToggle(){
+        let button = document.getElementById("cellSizeLockButton");
+        cfg.cellSizeLock = !cfg.cellSizeLock;
+        button.innerText = (cfg.cellSizeLock)? "(X)Toggle auto cell sizing" : "( )Toggle auto cell sizing";
+    }
           
     /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
     function parseRLE (input, newState) { // http://www.conwaylife.com/wiki/Run_Length_Encoded
