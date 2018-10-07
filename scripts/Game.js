@@ -2,10 +2,9 @@
     dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
     outlines should be made to be one pixel wide, or a configurable preference.
     at a certain cell size, the border should throw away cells or let them go off screen
-    screen should have a cell size lock and shift lock.
-    zoom in/out should be a user config feature.
-    a config should be added for husks vs shadows
-    a config button should be added for persistant husks/shadows.
+    zoom in/out should be a user config feature. (zoom should be mouse wheel, and should center zoomed in square)
+    user should be able to drag perspective
+    a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
     the ability to rewind/undo should be a toggle, as it is probably resource intensive.
 */
 
@@ -24,7 +23,7 @@ console.time("its");
                 // I only changed this for fun, but would prefer it to be clear. Can't remember how.
             outlineThick: 1
         },
-        husks: true, // whether to show full fading squares or only outlines for dead cells.
+        deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
         killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
         opacityAging: true,
         enableUndo: true,
@@ -379,10 +378,12 @@ console.time("its");
             checkIncreaseCellSize()
 
         // draw cells killed since last state
-        if (cfg.killedFadeOut) {
-            for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
-                for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
-                    drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+        if (cfg.deadCellType != 0){
+            if (cfg.killedFadeOut) {
+                for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
+                    for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
+                        drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+                    }
                 }
             }
         }
@@ -409,7 +410,7 @@ console.time("its");
 
     function drawDeadCell (x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
         let size = state.cellSize;
-        if (cfg.husks){
+        if (cfg.deadCellType == 2){ // husks
             ctx.beginPath();
             ctx.rect(x * size, y * size, size, size);
             switch (m){
@@ -426,7 +427,7 @@ console.time("its");
             ctx.lineWidth = 1;
             ctx.stroke()
         }
-        else {
+        else if (cfg.deadCellType == 1) { // shadows
             // this section needs to be changed in order to get better efficiency.
             if (cfg.opacityAging) {
                 let opacity = ((state.deadMatrices.length - m) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
@@ -482,13 +483,23 @@ console.time("its");
     function shiftLockToggle(){
         let button = document.getElementById("shiftLockButton");
         cfg.shiftLock = !cfg.shiftLock;
-        button.innerText = (cfg.shiftLock)? "(X) Toggle perspective lock" : "( ) Toggle perspective lock";        
+        button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";        
     }
 
     function cellSizeLockToggle(){
         let button = document.getElementById("cellSizeLockButton");
         cfg.cellSizeLock = !cfg.cellSizeLock;
-        button.innerText = (cfg.cellSizeLock)? "(X)Toggle auto cell sizing" : "( )Toggle auto cell sizing";
+        button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
+    }
+
+    function changeResidue(){
+        let button = document.getElementById("changeResidueButton");
+        if (cfg.deadCellType === 2)
+            cfg.deadCellType = 0;
+        else
+            cfg.deadCellType++;
+        // add text for NEXT cell type
+        button.innerText = (cfg.deadCellType === 0)? "Shadows" : (cfg.deadCellType === 1)? "Husks" : "Hide residues";
     }
           
     /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
