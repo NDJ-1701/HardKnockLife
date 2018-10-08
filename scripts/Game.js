@@ -28,8 +28,7 @@ console.time("its");
         opacityAging: true,
         enableUndo: true,
         maxUndo: 20,
-        shiftLock: false,
-        cellSizeLock: false
+        shiftLock: false
     }
 
     //// Setup, Config, etc...
@@ -110,10 +109,8 @@ console.time("its");
             return (this.yMax - this.yMin);
         },
         resetShiftValues: function() {
-            if (!cfg.shiftLock){
-                this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
-                this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
-            }
+            this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
+            this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
         },
         checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
             if( (this.xShift === 0 && this.yShift === 0) ||
@@ -259,14 +256,6 @@ console.time("its");
     function addCellAtCursorPosition(event) {
         const rect = canvas.getBoundingClientRect(); // needs to be here because canvas can move if window is resized or scrolled.
 
-        //let x = event.clientX - canvas.offsetLeft;// - rect.offsetLeft;
-        //let y = event.clientY - canvas.offsetTop;// - rect.offsetTop;
-        console.log('event x', event.clientX);
-        console.log('offsetleft', canvas.offsetLeft);
-        console.log('rect left', rect.left);
-        console.log('client - left', event.clientX - rect.left);
-        console.log('client - canvasleft', event.clientX - canvas.offsetLeft);
-
         // get mouse click location relative to canvas
         let x = event.clientX - rect.left; // integer mouse cursor tip offset
         x = Math.floor(x / state.cellSize);
@@ -291,8 +280,8 @@ console.time("its");
         state.matrix = [[], []];
         state.deadMatrices = [];
         state.minMaxes = [undefined, undefined, undefined, undefined];
-        //state.xShift = 0;
-        //state.yShift = 0;
+        state.xShift = 0;
+        state.yShift = 0;
         drawState();
     }
     //
@@ -373,9 +362,11 @@ console.time("its");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // set new cell size and shift value
-        state.checkResetShiftValues();
-        if (!cfg.cellSizeLock && !checkReduceCellSize())
-            checkIncreaseCellSize()
+        if (!cfg.shiftLock){
+            state.checkResetShiftValues();
+            if (!checkReduceCellSize())
+                checkIncreaseCellSize()
+        }
 
         // draw cells killed since last state
         if (cfg.deadCellType != 0){
@@ -484,12 +475,6 @@ console.time("its");
         let button = document.getElementById("shiftLockButton");
         cfg.shiftLock = !cfg.shiftLock;
         button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";        
-    }
-
-    function cellSizeLockToggle(){
-        let button = document.getElementById("cellSizeLockButton");
-        cfg.cellSizeLock = !cfg.cellSizeLock;
-        button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
     }
 
     function changeResidue(){
