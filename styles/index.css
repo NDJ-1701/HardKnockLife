@@ -30,6 +30,7 @@ p {
 }
 #toggles {
   display: inline-block;
+  margin: 5px;
   background-color: #dddddd;
   text-align: left;
 }

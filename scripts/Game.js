@@ -371,6 +371,7 @@ console.time("its");
     function cellSizeByInput () {
         let newCellSize = Math.pow(2, cellSizeInput.value);
         cellSizeOutput.value = newCellSize + 'px';
+        cfg.shiftLock = !cfg.shiftLock;
         state.changeCellSizeTo(newCellSize);
         drawState();
         // hmm, this isn't producing a visible change... NaOH will know better how to hook it up.
@@ -708,7 +709,7 @@ console.time("its");
         // we should probably be setting the properties of newstate in here and then replacing the entire state object
 
         // indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
-        if (cfg.killedFadeOut) {
+        if (cfg.deadCellType) {
             state.deadMatrices.unshift(killedMatrix);
             if (state.deadMatrices.length > cfg.killedFadeOut)
                 state.deadMatrices.pop();
