@@ -492,14 +492,18 @@ console.time("its");
         button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
     }
 
-    function changeResidue(){
-        let button = document.getElementById("changeResidueButton");
-        if (cfg.deadCellType === 2)
-            cfg.deadCellType = 0;
-        else
-            cfg.deadCellType++;
-        // add text for NEXT cell type
-        button.innerText = (cfg.deadCellType === 0)? "Shadows" : (cfg.deadCellType === 1)? "Husks" : "Hide residues";
+    // function OLDchangeResidue(){
+    //     let button = document.getElementById("changeResidueButton");
+    //     if (cfg.deadCellType === 2)
+    //         cfg.deadCellType = 0;
+    //     else
+    //         cfg.deadCellType++;
+    //     // add text for NEXT cell type
+    //     button.innerText = (cfg.deadCellType === 0)? "Shadows" : (cfg.deadCellType === 1)? "Husks" : "Hide residues";
+    // }
+
+    function changeResidue () {
+        cfg.deadCellType = document.querySelector('input[name="residues"]:checked').value;
     }
           
     /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
