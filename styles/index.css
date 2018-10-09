@@ -30,11 +30,12 @@ p {
 }
 #toggles {
   display: inline-block;
+  width: 200px;
   margin: 5px;
   background-color: #dddddd;
   text-align: left;
 }
-#cellSizeInput {
+input[type="range"] {
   width: 60px;
 }
 

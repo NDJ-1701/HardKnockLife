@@ -25,7 +25,7 @@ console.time("its");
         initialCellSize: 8, // valid cell sizes are: 1,2,4,8,16,32,64
         maximumCellSize: 64,
         minimumCellSize: 1,
-        tickRate: 222,
+        tickRate: 250,
         cellStyle: {
             bodyColor: 'black',
             outlineColor: 'rgb(173, 216, 230)', //'lightblue'
@@ -372,9 +372,16 @@ console.time("its");
         let newCellSize = Math.pow(2, cellSizeInput.value);
         cellSizeOutput.value = newCellSize + 'px';
         cfg.shiftLock = true;
+        document.getElementById("autoZoom").checked = false;
         state.changeCellSizeTo(newCellSize);
         drawState();
         // hmm, this isn't producing a visible change... NaOH will know better how to hook it up.
+    }
+
+    function tickrateByInput () {
+        let newTickrate = Math.round(1000 / Math.pow(2, tickrateInput.value));
+        tickrateOutput.value = newTickrate + "ms"
+        cfg.tickRate = newTickrate;
     }
 
     function zoom(event){

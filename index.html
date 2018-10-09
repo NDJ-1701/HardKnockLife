@@ -36,8 +36,11 @@
                 <input id="husks" type="radio" name="residues" onclick="changeResidue()" value=2><label for="husks">Husks</label><br>
                 <input id="autoZoom" type="checkbox" value="unlocked" onclick="shiftLockToggle()" checked/><label for="autoZoom">Auto Zoom</label><br>
                 <label for="cellSizeInput">Cell Size:</label>
-                <input id="cellSizeInput" type="range" value="3" min="0" max="6" list="sizeList" oninput="cellSizeByInput()">
-                <output id="cellSizeOutput">8px</output>
+                <input id="cellSizeInput" type="range" value="3" min="0" max="6" oninput="cellSizeByInput()">
+                <output id="cellSizeOutput">8px</output><br>
+                <label for="tickrateInput">Tickrate:</label>
+                <input id="tickrateInput" type="range" value="2" min="-2" max="9" oninput="tickrateByInput()">
+                <output id="tickrateOutput">250ms</output>
             </form>
         </div>  
     </div>
