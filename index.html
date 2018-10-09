@@ -24,18 +24,20 @@
             <button onclick="speedRun()">Speed up</button>
             <button onclick="slowRun()">Slow down</button>
             <br>
-            <!-- <br> -->
             <button onclick="clearState()">Clear</button>
             <button onclick="saveState()">Save</button>
             <button onclick="stepBack()">Undo</button>
             <button onclick="resetState()">Reset</button>
         </div>
-        <form id="toggles">
-            <input type="radio" name="residues" onclick="changeResidue()" value=0 checked> No Residues<br>
-            <input type="radio" name="residues" onclick="changeResidue()" value=1> Shadows<br>
-            <input type="radio" name="residues" onclick="changeResidue()" value=2> Husks<br>
-            <button id="shiftLockButton" onclick="shiftLockToggle()">( ) Perspective Lock</button>
-        </form>
+        <div id="toggles">
+            <form autocomplete="off">
+                <input id="noResids" type="radio" name="residues" onclick="changeResidue()" value=0 checked><label for="noResids">No Residues</label><br>
+                <input id="shadows" type="radio" name="residues" onclick="changeResidue()" value=1><label for="shadows">Shadows</label><br>
+                <input id="husks" type="radio" name="residues" onclick="changeResidue()" value=2><label for="husks">Husks</label><br>
+                <input id="lockPers" type="checkbox" name="shiftLockCheckBox" value="unlocked" onclick="shiftLockToggle()"/><label for="lockPers">Lock Perspective</label><br>
+            </form>
+            <!-- <button id="shiftLockButton" onclick="shiftLockToggle()">( ) Perspective Lock</button> -->
+        </div>  
     </div>
 
     <div id="canvasStack">
