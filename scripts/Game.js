@@ -344,8 +344,6 @@ console.time("its");
         drawState();
     }
 
-
-
     function checkReduceCellSize(decreased = false, zoom = false) {
         if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
             // if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
@@ -368,6 +366,14 @@ console.time("its");
             }
         }
         return increased;
+    }
+
+    function cellSizeByInput () {
+        let newCellSize = Math.pow(2, cellSizeInput.value);
+        cellSizeOutput.value = newCellSize + 'px';
+        state.changeCellSizeTo(newCellSize);
+        drawState();
+        // hmm, this isn't producing a visible change... NaOH will know better how to hook it up.
     }
 
     function zoom(event){
@@ -556,16 +562,16 @@ console.time("its");
     }
 
     function shiftLockToggle(){
-        let button = document.getElementById("shiftLockButton");
+        // let button = document.getElementById("shiftLockButton");
         cfg.shiftLock = !cfg.shiftLock;
-        button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";        
+        // button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";     
     }
 
-    function cellSizeLockToggle(){
-        let button = document.getElementById("cellSizeLockButton");
-        cfg.cellSizeLock = !cfg.cellSizeLock;
-        button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
-    }
+    // function cellSizeLockToggle(){
+    //     let button = document.getElementById("cellSizeLockButton");
+    //     cfg.cellSizeLock = !cfg.cellSizeLock;
+    //     button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
+    // }
     
     function changeResidue () {
         cfg.deadCellType = document.querySelector('input[name="residues"]:checked').value;
