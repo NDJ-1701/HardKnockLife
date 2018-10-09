@@ -14,7 +14,6 @@
     <div id="commentBox" class="scroll-box centerUs">
         <p id="comments">Comments about this Pattern:</p>
     </div>
-<<<<<<< HEAD
     <div id="controls" class="centerUs">
         <div id="buttons">
             <button onclick="loadPattern()">Wiki Pattern</button>
@@ -24,39 +23,19 @@
             <button id="runButton" onclick="run()">Run</button>
             <button onclick="speedRun()">Speed up</button>
             <button onclick="slowRun()">Slow down</button>
-            <!-- <button id="changeResidueButton" onclick="changeResidue()">Shadows</button> -->
             <br>
-            <button id="shiftLockButton" onclick="shiftLockToggle()">( ) Perspective Lock</button>
-            <button id="cellSizeLockButton" onclick="cellSizeLockToggle()">( )  Lock Cell Size</button>
-            <br>
+            <!-- <br> -->
             <button onclick="clearState()">Clear</button>
             <button onclick="saveState()">Save</button>
             <button onclick="stepBack()">Undo</button>
             <button onclick="resetState()">Reset</button>
         </div>
         <form id="toggles">
-            <input type="radio" name="residues" onclick="changeResidue()" value=0 checked> No Residues .<br>
+            <input type="radio" name="residues" onclick="changeResidue()" value=0 checked> No Residues<br>
             <input type="radio" name="residues" onclick="changeResidue()" value=1> Shadows<br>
             <input type="radio" name="residues" onclick="changeResidue()" value=2> Husks<br>
+            <button id="shiftLockButton" onclick="shiftLockToggle()">( ) Perspective Lock</button>
         </form>
-=======
-    <div class="centerUs">
-        <button onclick="loadPattern()">Wiki Pattern</button>
-        <button id="randomButton" onclick="random()">Random</button>
-        <button onclick="drawState(stepState(1))">Step</button>
-        <br>
-        <button id="runButton" onclick="run()">Run</button>
-        <button onclick="speedRun()">Speed up</button>
-        <button onclick="slowRun()">Slow down</button>
-        <button id="changeResidueButton" onclick="changeResidue()">Shadows</button>
-        <br>
-        <button id="shiftLockButton" onclick="shiftLockToggle()">( ) Perspective Lock</button>
-        <br>
-        <button onclick="clearState()">Clear</button>
-        <button onclick="saveState()">Save</button>
-        <button onclick="stepBack()">Undo</button>
-        <button onclick="resetState()">Reset</button>
->>>>>>> NDJ
     </div>
 
     <div id="canvasStack">
