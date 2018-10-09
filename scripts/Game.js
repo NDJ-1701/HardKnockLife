@@ -1,11 +1,20 @@
 /* desired improvements:
+
     dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
+
     outlines should be made to be one pixel wide, or a configurable preference.
+
     at a certain cell size, the border should throw away cells or let them go off screen
-    zoom in/out should be a user config feature. (zoom should be mouse wheel, and should center zoomed in square)
-    user should be able to drag perspective
+    
+    a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
+
     a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
+
     the ability to rewind/undo should be a toggle, as it is probably resource intensive.
+
+    it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
+    that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
+    decrease methods.
 */
 
 ////// Conway's game of life
@@ -13,8 +22,9 @@ console.time("its");
 { // Um, is that block really all I have to do to scope all my variables.?
 
     let cfg = {
-        initialCellSize: 10, // 10 pixels per cell
-        maximumCellSize: 16,
+        initialCellSize: 8, // valid cell sizes are: 1,2,4,8,16,32,64
+        maximumCellSize: 64,
+        minimumCellSize: 1,
         tickRate: 222,
         cellStyle: {
             bodyColor: 'black',
@@ -36,9 +46,10 @@ console.time("its");
 
     var container = document.getElementById( 'canvas' );
     let ctx = canvas.getContext("2d");
-    canvas.addEventListener("mousedown", addCellAtCursorPosition, false);
-    let gridWidth = canvas.width / cfg.gridSize;
-    let gridHeight = canvas.height / cfg.gridSize;
+    canvas.addEventListener("mousemove", activateDrag);
+    canvas.addEventListener("mousedown", mouseDown);
+    canvas.addEventListener("mouseup", mouseUp);
+    canvas.addEventListener("wheel", zoom);
     let oldStates = [];
 
     let running = false;
@@ -70,10 +81,10 @@ console.time("its");
 
     const StateProtoType = {
         cellSize: cfg.initialCellSize,
-        gridWidth: Math.floor(canvas.width / cfg.initialCellSize),
-        gridHeight: Math.floor(canvas.height / cfg.initialCellSize),
         xShift: 0,
         yShift: 0,
+        get gridWidth() { return Math.floor(canvas.width / this.cellSize)},
+        get gridHeight() { return Math.floor(canvas.height / this.cellSize)},
         refreshMinMaxes: function(){
             this.xMin = Math.min(...this.x);
             this.xMax = Math.max(...this.x);
@@ -90,16 +101,12 @@ console.time("its");
         init: function(initialMatrix, initialComments){
             this.setComments(initialComments);
             this.matrix = initialMatrix;
-            // this.xMin = Math.min(...initialSetup[0]);
-            // this.xMax = Math.max(...initialSetup[0]);
-            // this.yMin = Math.min(...initialSetup[1]);
-            // this.yMax = Math.max(...initialSetup[1]);
             this.refreshMinMaxes();
             this.resetShiftValues();
             this.deadMatrices = [];
             this.cellSize = cfg.initialCellSize;
-            this.gridWidth = Math.floor(canvas.width / cfg.initialCellSize);
-            this.gridHeight = Math.floor(canvas.height / cfg.initialCellSize);
+            // this.gridWidth = Math.floor(canvas.width / cfg.initialCellSize);
+            // this.gridHeight = Math.floor(canvas.height / cfg.initialCellSize);
             this.save();
         },
         get cellsWide() {
@@ -109,8 +116,10 @@ console.time("its");
             return (this.yMax - this.yMin);
         },
         resetShiftValues: function() {
-            this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
-            this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            if (!cfg.shiftLock){
+                this.xShift = Math.floor((this.gridWidth - this.cellsWide) / 2) - this.xMin;
+                this.yShift = Math.floor((this.gridHeight - this.cellsTall) / 2) - this.yMin;
+            }
         },
         checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
             if( (this.xShift === 0 && this.yShift === 0) ||
@@ -185,8 +194,6 @@ console.time("its");
         },
         changeCellSizeTo: function(newSize) {
             this.cellSize = newSize;
-            this.gridWidth = Math.floor(canvas.width / this.cellSize);
-            this.gridHeight = Math.floor(canvas.height / this.cellSize);
             this.resetShiftValues();
         },
         save: function () {
@@ -253,18 +260,21 @@ console.time("its");
         return -1;
     }
 
-    function addCellAtCursorPosition(event) {
+    function getMouseCoordinate(event, m){
         const rect = canvas.getBoundingClientRect(); // needs to be here because canvas can move if window is resized or scrolled.
-
-        // get mouse click location relative to canvas
         let x = event.clientX - rect.left; // integer mouse cursor tip offset
-        x = Math.floor(x / state.cellSize);
         let y = event.clientY - rect.top; // integer mouse cursor tip offset
-        y = Math.floor(y / state.cellSize);
+        m.x = Math.floor(x / state.cellSize);
+        m.y = Math.floor(y / state.cellSize);
+    }
 
-        let index = paraInd(x - state.xShift, y - state.yShift, state.x, state.y); // check if cell exists in state matrix
+    function addCellAtCursorPosition(event) {
+        let m = {}; // will contain an x and y cell location
+        getMouseCoordinate(event, m);
+        console.log('x, y', m.x, m.y);
+        let index = paraInd(m.x - state.xShift, m.y - state.yShift, state.x, state.y); // check if cell exists in state matrix
         if (index === -1) { // if not found, add the cell to the state
-            state.push(x - state.xShift, y - state.yShift);
+            state.push(m.x - state.xShift, m.y - state.yShift);
         }
         else { // if found, delete the cell
             state.remove(index);
@@ -336,24 +346,98 @@ console.time("its");
 
 
 
-    function checkReduceCellSize(decreased = false) {
-        if ((state.cellSize >= 2) && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight)) {
+    function checkReduceCellSize(decreased = false, zoom = false) {
+        if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
             // if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-
-            state.changeCellSizeTo(state.cellSize / 2);
-            return checkReduceCellSize(true);
+            let newCellSize = state.cellSize / 2;
+            if (newCellSize >= cfg.minimumCellSize){
+                state.changeCellSizeTo(newCellSize);
+                return checkReduceCellSize(true);
+            }
         }
         return decreased;
     }
 
-    function checkIncreaseCellSize(increased = false) {
-        if ((state.cellSize <= cfg.maximumCellSize) &&
-        (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize))/2) - 5)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize ))/2) - 5)))) {
+    function checkIncreaseCellSize(increased = false, zoom = false) {
+        if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize))/2) - 5)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize ))/2) - 5))))) {
             // if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
-            state.changeCellSizeTo(state.cellSize * 2);
-            return checkIncreaseCellSize(true);
+            let newCellSize = state.cellSize * 2;
+            if (newCellSize <= cfg.maximumCellSize){
+                state.changeCellSizeTo(newCellSize);
+                return checkIncreaseCellSize(true);
+            }
         }
         return increased;
+    }
+
+    function zoom(event){
+        if (!cfg.shiftLock)
+            shiftLockToggle();
+        let zoomIn = (event.deltaY < 0)? true : false; // true for zoom in, false for zoom out
+
+        if (zoomIn && (state.cellSize < cfg.maximumCellSize)) { // zoom in
+            let m = {}; // will contain an x and y cell location relative to canvas grid (unshifted)
+            getMouseCoordinate(event, m);
+            checkIncreaseCellSize(false, true);
+            let xShiftChange = Math.floor( m.x - (state.gridWidth / 2)); // shift the left edge of the visible grid to the mouse position, minus half the new grid's width (centering the mouse position)
+            let yShiftChange = Math.floor( m.y - (state.gridHeight / 2));
+            state.xShift = state.xShift - xShiftChange;
+            state.yShift = state.yShift - yShiftChange;
+            drawState();
+        }
+        else if (!zoomIn && state.cellSize > cfg.minimumCellSize){ // zoom out
+            let oldGridWidth = state.gridWidth;
+            let oldGridHeight = state.gridHeight;
+            checkReduceCellSize(false, true);
+            let newGridWidth = state.gridWidth;
+            let newGridHeight = state.gridHeight;
+            let xShiftChange = Math.floor((newGridWidth - oldGridWidth) / 2); // shift the left edge of the visible grid by the increased number of cells to the left.
+            let yShiftChange = Math.floor((newGridHeight - oldGridHeight) / 2); // shift the top edge of the visible grid by the increased number of cells to the top.
+            state.xShift = state.xShift + xShiftChange;
+            state.yShift = state.yShift + yShiftChange;            
+            drawState();
+        }        
+    }
+
+    const dragStartPosition = {};
+    const dragIntermediatePosition = {};
+    let dragging = false;
+    let listen = false;
+    function activateDrag(event){
+        if (!dragging && listen){ // check if we need to activate dragging
+            getMouseCoordinate(event, dragIntermediatePosition);
+            if(dragStartPosition.x != dragIntermediatePosition.x && dragStartPosition.y != dragIntermediatePosition.y){ // we are dragging when our mouse has moved one cell away from the mousedown location
+                dragging = true;
+                listen = false; // stop checking, we know we are in a drag event
+            }    
+        }
+    }
+
+    function mouseDown(event){
+        getMouseCoordinate(event, dragStartPosition);
+        listen = true; // start checking for a drag event
+    }
+
+    function mouseUp(event){
+        if (dragging)
+            dragEnd(event); // we are dragging, so shift cells
+        else
+            addCellAtCursorPosition(event); // we are not dragging, so add cell at mouse pos
+        dragging = false;
+        listen = false;
+    }
+
+    function dragEnd(event){
+        if (!cfg.shiftLock)
+            shiftLockToggle();
+        const dragEndPosition = {};
+        getMouseCoordinate(event, dragEndPosition);
+        // get cell # difference between drag start pos and end pos, this will be the change in shift value.
+        dragEndPosition.x = dragStartPosition.x - dragEndPosition.x;
+        dragEndPosition.y = dragStartPosition.y - dragEndPosition.y;
+        state.xShift = state.xShift - dragEndPosition.x;
+        state.yShift = state.yShift - dragEndPosition.y;
+        drawState(); 
     }
 
     // Library of custom functions...
