@@ -371,7 +371,7 @@ console.time("its");
     function cellSizeByInput () {
         let newCellSize = Math.pow(2, cellSizeInput.value);
         cellSizeOutput.value = newCellSize + 'px';
-        cfg.shiftLock = !cfg.shiftLock;
+        cfg.shiftLock = true;
         state.changeCellSizeTo(newCellSize);
         drawState();
         // hmm, this isn't producing a visible change... NaOH will know better how to hook it up.
