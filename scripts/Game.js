@@ -1,23 +1,26 @@
-/* desired improvements:
+/* desired changes:
 bugs:
-- when shift lock is enabled, it should temporarily disable when loading a new wiki structure. Cell size should also be reset to initial.
-- after clearing the space, with shift lock disabled, the first square is put in the center
+    none known
 
-dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
+enhancements:
+    dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
 
-outlines should be made to be one pixel wide, or a configurable preference.
+    outlines should be made to be one pixel wide, or a configurable preference.
 
-at a certain cell size, the border should throw away cells or let them go off screen
-    
-a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
+    at a certain cell size, the border should throw away cells or let them go off screen
+        
+    a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
 
-a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
+    a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
 
-the ability to rewind/undo should be a toggle, as it is probably resource intensive.
+    the ability to rewind/undo should be a toggle, as it is probably resource intensive.
 
-it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
-that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
-decrease methods.
+    it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
+    that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
+    decrease methods.
+
+questions:
+    I'd like an explanation why we are using JSON for saving the state.
 */
 
 ////// Conway's game of life
@@ -48,7 +51,6 @@ console.time("its");
         set shiftLock(lock) {
             document.getElementById("autoZoom").checked = !lock;
             this.sL = lock;
-            console.log('shift lock toggled appropriately');
         }
     }
 
@@ -92,8 +94,8 @@ console.time("its");
 
     const StateProtoType = {
         cellSize: cfg.initialCellSize,
-        xShift: 0,
-        yShift: 0,
+        xShift: null,
+        yShift: null,
         get gridWidth() { return Math.floor(canvas.width / this.cellSize)},
         get gridHeight() { return Math.floor(canvas.height / this.cellSize)},
         refreshMinMaxes: function(){
@@ -133,7 +135,7 @@ console.time("its");
             }
         },
         checkResetShiftValues: function() {// reshifts only if cells go out of bounds.
-            if( (this.xShift === 0 && this.yShift === 0) ||
+            if( (this.xShift === null && this.yShift === null) ||
                 (this.xMin + this.xShift) < 0 ||
                 (this.xMax + this.xShift) > this.gridWidth ||
                 (this.yMin + this.yShift) < 0 ||
@@ -160,13 +162,13 @@ console.time("its");
                 this.x.push(x);
                 this.y.push(y);
             //}
-            if (x < this.xMin || (this.xMin === undefined))
+            if (x < this.xMin || (this.xMin === null))
                 this.xMin = x;
-            if (x > this.xMax || (this.xMax === undefined))
+            if (x > this.xMax || (this.xMax === null))
                 this.xMax = x;
-            if (y < this.yMin || (this.yMin === undefined))
+            if (y < this.yMin || (this.yMin === null))
                 this.yMin = y;
-            if (y > this.yMax || (this.yMax === undefined))
+            if (y > this.yMax || (this.yMax === null))
                 this.yMax = y;
         },
         privateSpliceAtIndex: function(index) { // removes an xy pair at index. This function should only be used by the following "remove" function
@@ -209,12 +211,17 @@ console.time("its");
         },
         save: function () {
             this.saved = JSON.stringify(this.matrix);
+            this.savedXShift = this.xShift;
+            this.savedYShift = this.yShift;
+            this.savedCellSize = this.cellSize;
         },
         reset: function () {
             this.matrix = JSON.parse(this.saved);
             this.deadMatrices = [];
             this.refreshMinMaxes();
-            // this.printComments(); shouldn't be necessary, comments should already be there.
+            this.xShift = this.savedXShift;
+            this.yShift = this.savedYShift;
+            this.cellSize = this.savedCellSize;
         }
     };
 
@@ -229,10 +236,13 @@ console.time("its");
         // s.xDead = [];
         // s.yDead = [];
         s.deadMatrices = [];
-        s.xMin;
-        s.xMax;
-        s.yMin;
-        s.yMax;
+        s.xMin = null;
+        s.xMax = null;
+        s.yMin = null;
+        s.yMax = null;
+        s.savedXShift = 0;
+        s.savedYShift = 0;
+        s.savedCellSize = 8;
 
         if (initialize)
             s.init(initialSetup, initialSetupComments);
@@ -242,10 +252,7 @@ console.time("its");
     }
 
     //// Game flow starts here...
-    // let state = Object.create(State);
     let state = new State(true);
-    // state.save(); // These two lines could be done in the constructor if we used the "new" syntax instead
-    // document.getElementById('comments').innerHTML = state.comments; // They have to be somewhere after state is created. 
     drawState();
     
     //// ... User interaction ...
@@ -306,10 +313,8 @@ console.time("its");
     }
     //
     function resetState() {
-        console.log('pre reset', state);
         //state.init(); // Max used the reset function instead
         state.reset();
-        console.log('post reset', state);
         drawState();
     }
     //
@@ -321,13 +326,19 @@ console.time("its");
 
     function loadPattern () {
         clearState();
+        let shiftState = cfg.shiftLock;
+        cfg.shiftLock = false;
         const newState = new State();
         parseRLE(patternsArray[getRandomInt(patternsArray.length - 1)], newState);
         state.init(newState.matrix);
         state.setComments(newState.comments);
         console.log('loaded matrix', state.matrix);
-        state.save();
         drawState();
+        if (state.cellSize > 8)
+            zoomTo(8);
+        cfg.shiftLock = shiftState;
+
+        state.save();
     }
 
     /// randomly fill the canvas with cells
