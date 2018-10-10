@@ -1,20 +1,23 @@
 /* desired improvements:
+bugs:
+- when shift lock is enabled, it should temporarily disable when loading a new wiki structure. Cell size should also be reset to initial.
+- after clearing the space, with shift lock disabled, the first square is put in the center
 
-    dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
+dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
 
-    outlines should be made to be one pixel wide, or a configurable preference.
+outlines should be made to be one pixel wide, or a configurable preference.
 
-    at a certain cell size, the border should throw away cells or let them go off screen
+at a certain cell size, the border should throw away cells or let them go off screen
     
-    a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
+a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
 
-    a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
+a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
 
-    the ability to rewind/undo should be a toggle, as it is probably resource intensive.
+the ability to rewind/undo should be a toggle, as it is probably resource intensive.
 
-    it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
-    that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
-    decrease methods.
+it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
+that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
+decrease methods.
 */
 
 ////// Conway's game of life
@@ -38,7 +41,15 @@ console.time("its");
         opacityAging: true,
         enableUndo: true,
         maxUndo: 20,
-        shiftLock: false
+        sL: false,
+        get shiftLock(){
+            return this.sL;
+        },
+        set shiftLock(lock) {
+            document.getElementById("autoZoom").checked = !lock;
+            this.sL = lock;
+            console.log('shift lock toggled appropriately');
+        }
     }
 
     //// Setup, Config, etc...
@@ -271,7 +282,6 @@ console.time("its");
     function addCellAtCursorPosition(event) {
         let m = {}; // will contain an x and y cell location
         getMouseCoordinate(event, m);
-        console.log('x, y', m.x, m.y);
         let index = paraInd(m.x - state.xShift, m.y - state.yShift, state.x, state.y); // check if cell exists in state matrix
         if (index === -1) { // if not found, add the cell to the state
             state.push(m.x - state.xShift, m.y - state.yShift);
@@ -369,20 +379,27 @@ console.time("its");
     }
 
     function cellSizeByInput () {
-        let newCellSize = Math.pow(2, cellSizeInput.value);
+        let newCellSize = Math.pow(2, cellSizeInput.value); // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
         cellSizeOutput.value = newCellSize + 'px';
         cfg.shiftLock = true;
-        document.getElementById("autoZoom").checked = false;
-        state.changeCellSizeTo(newCellSize);
-        drawState();
-        // hmm, this isn't producing a visible change... NaOH will know better how to hook it up.
+        zoomTo(newCellSize);
     }
 
-    function tickrateByInput () {
-        let newTickrate = Math.round(1000 / Math.pow(2, tickrateInput.value));
-        tickrateOutput.value = newTickrate + "ms"
-        cfg.tickRate = newTickrate;
-    }
+    function zoomTo(newCellSize){
+        const rect = canvas.getBoundingClientRect(); // needs to be here because canvas can move if window is resized or scrolled.
+		let event = {
+			clientX: rect.left + canvas.width / 2, // figure out middle X coordinate and put it here
+			clientY: rect.top + canvas.height / 2 // figure out middle Y coordinate and put it here
+		}
+		if (state.cellSize > newCellSize)
+			event["deltaY"] = 100; // zoom out
+		else
+			event["deltaY"] = -100; // zoom in
+
+		while (state.cellSize != newCellSize){
+			zoom(event);
+		}
+	}
 
     function zoom(event){
         if (!cfg.shiftLock)
@@ -420,7 +437,7 @@ console.time("its");
     function activateDrag(event){
         if (!dragging && listen){ // check if we need to activate dragging
             getMouseCoordinate(event, dragIntermediatePosition);
-            if(dragStartPosition.x != dragIntermediatePosition.x && dragStartPosition.y != dragIntermediatePosition.y){ // we are dragging when our mouse has moved one cell away from the mousedown location
+            if(dragStartPosition.x != dragIntermediatePosition.x || dragStartPosition.y != dragIntermediatePosition.y){ // we are dragging when our mouse has moved one cell away from the mousedown location
                 dragging = true;
                 listen = false; // stop checking, we know we are in a drag event
             }    
@@ -532,6 +549,12 @@ console.time("its");
         }
     }
 
+    function tickrateByInput () {
+        let newTickrate = Math.round(1000 / Math.pow(2, tickrateInput.value));
+        tickrateOutput.value = newTickrate + "ms"
+        cfg.tickRate = newTickrate;
+    }
+
     /// infinitely run the interval stepper until user clicks stop
     function run() {
         running = !running; // used to toggle on or off interval stepper
@@ -552,21 +575,6 @@ console.time("its");
         }
         else
             button.innerText = "Run";
-    }
-
-    function slowRun(){
-        if (cfg.tickRate >= 37)
-            cfg.tickRate += 37;
-        else
-            cfg.tickRate += 10;
-    }
-
-    function speedRun(){
-        if (cfg.tickRate > 37)
-            cfg.tickRate -= 37;
-        else if (cfg.tickRate > 7){
-            cfg.tickRate -= 10;
-        }
     }
 
     function shiftLockToggle(){
@@ -601,10 +609,7 @@ console.time("its");
             height = p2;
             // return m; Not actually using replace functionality here, just needed access to p1, p2
         });
-        //let xOffset = Math.floor((canvas.width / 2) / cfg.gridSize - width / 2); // offset so that pattern draws in the middle of canvas
-        //let yOffset = Math.floor((canvas.height / 2) / cfg.gridSize - height / 2);
         let codedLines = lines.filter(line=> !/^(#|x)/i.test(line)); // keep everything except comment lines and the header line
-        //let matrix = [[],[]];
         let x = 0;
         let y = 0;
         for (let i = 0; i < codedLines.length; i++) { // loop through the lines pushing live cells and skipping dead ones
@@ -614,8 +619,6 @@ console.time("its");
                 while (p1-- > 0) {
                     switch (p2) {
                     case 'o': // if it's alive, push it and move on
-                        //matrix[0].push(x + xOffset);
-                        //matrix[1].push(y + yOffset);
                         newState.push(x,y);
                         x++;  break;
                     case 'b': // if it's dead, do nothing but move on
@@ -634,6 +637,7 @@ console.time("its");
     }
 
     function stepBack(){
+        running = false;
         if (oldStates.length > 0){
             let lastState = oldStates.pop();
             state.init(lastState.matrix, lastState.comments);

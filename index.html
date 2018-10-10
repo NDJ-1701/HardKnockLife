@@ -18,15 +18,13 @@
         <div id="buttons">
             <button onclick="loadPattern()">Wiki Pattern</button>
             <button id="randomButton" onclick="random()">Random</button>
-            <button onclick="drawState(stepState(1))">Step</button>
             <br>
+            <button onclick="drawState(stepState(1))">Step forward</button>
+            <button onclick="stepBack()">Step back</button>
             <button id="runButton" onclick="run()">Run</button>
-            <button onclick="speedRun()">Speed up</button>
-            <button onclick="slowRun()">Slow down</button>
             <br>
             <button onclick="clearState()">Clear</button>
             <button onclick="saveState()">Save</button>
-            <button onclick="stepBack()">Undo</button>
             <button onclick="resetState()">Reset</button>
         </div>
         <div id="toggles">
