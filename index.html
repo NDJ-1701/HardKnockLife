@@ -10,11 +10,10 @@
 
 <body>
     <h1>It's a Hard Knock Game of Life!</h1>
-
-    <div id="commentBox" class="scroll-box centerUs">
-        <p id="comments">Comments about this Pattern:</p>
-    </div>
     <div id="controls" class="centerUs">
+        <div id="commentBox" class="scroll-box">
+            <p id="comments">Comments about this Pattern:</p>
+        </div>
         <div id="buttons">
             <button onclick="loadPattern()">Wiki Pattern</button>
             <button id="randomButton" onclick="random()">Random</button>
@@ -29,23 +28,30 @@
         </div>
         <div id="toggles">
             <form autocomplete="off">
-                <input id="noResids" type="radio" name="residues" onclick="changeResidue()" value=0 checked><label for="noResids">No Residues</label><br>
-                <input id="shadows" type="radio" name="residues" onclick="changeResidue()" value=1><label for="shadows">Shadows</label><br>
-                <input id="husks" type="radio" name="residues" onclick="changeResidue()" value=2><label for="husks">Husks</label><br>
-                <input id="autoZoom" type="checkbox" value="unlocked" onclick="shiftLockToggle()" checked/><label for="autoZoom">Auto Zoom</label><br>
                 <label for="cellSizeInput">Cell Size:</label>
-                <input id="cellSizeInput" type="range" value="3" min="0" max="6" oninput="cellSizeByInput()">
+                <input id="cellSizeInput" type="range" value="8" min="1" max="64" oninput="cellSizeByInput()">
                 <output id="cellSizeOutput">8px</output><br>
                 <label for="tickrateInput">Tickrate:</label>
                 <input id="tickrateInput" type="range" value="2" min="-2" max="9" oninput="tickrateByInput()">
                 <output id="tickrateOutput">250ms</output>
             </form>
+        </div>
+        <div id="settings">
+            <form autocomplete="off">
+                <input id="noResids" type="radio" name="residues" onclick="changeResidue()" value=0 checked><label for="noResids">No Residues</label><br>
+                <input id="shadows" type="radio" name="residues" onclick="changeResidue()" value=1><label for="shadows">Shadows</label><br>
+                <input id="husks" type="radio" name="residues" onclick="changeResidue()" value=2><label for="husks">Husks</label><br>
+                <input id="autoZoom" type="checkbox" value="unlocked" onclick="shiftLockToggle()" checked/><label for="autoZoom">Auto Zoom</label><br>
+            </form>
         </div>  
     </div>
 
-    <div id="canvasStack">
-        <canvas id="gameCanvas" width="800" height="600">
+    <div id="canvasStack" >
+        <canvas id="gameCanvas">
             No canvas support
+        </canvas>
+        <canvas id="gameBackgroundCanvas">
+                No canvas support
         </canvas>
     </div>
 

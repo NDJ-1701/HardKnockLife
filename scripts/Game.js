@@ -1,8 +1,18 @@
 /* desired changes:
 bugs:
-    none known
+	scrolling web page will cause zoom to occur. Perhaps we should make the user hold shift or something when mouse wheel zooming.
+	resizing the window after initial canvas setup will distort cell sizes.
+	hitting random after resizing cells forces cell size back to 8 pixes. Should leave cell size alone.
+	borders/husks are dithered, grid is not sharp
+
+comments / comments:
+	let newCellSize = cellSizeInput.value; // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
+
+	I'd like an explanation why we are using JSON for saving the state.
 
 enhancements:
+	We should draw a (optional) background grid for each resize.
+
     dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
 
     outlines should be made to be one pixel wide, or a configurable preference.
@@ -17,10 +27,10 @@ enhancements:
 
     it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
     that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
-    decrease methods.
-
-questions:
-    I'd like an explanation why we are using JSON for saving the state.
+	decrease methods.
+	
+	when adding a cell manually, it should not redraw all cells when it could just draw the one.
+    
 */
 ////// Conway's game of life
 console.time("its");
@@ -36,7 +46,11 @@ console.time("its");
 			outlineColor: 'rgb(173, 216, 230)', //'lightblue'
 			// Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
 			// I only changed this for fun, but would prefer it to be clear. Can't remember how.
-			outlineThick: 1
+			outlineThick: 0 // 0 for no outlines
+		},
+		gridEnabled: true,
+		gridStyle: {
+			color: "red"
 		},
 		deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
 		killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
@@ -54,17 +68,35 @@ console.time("its");
 	}
 
 	//// Setup, Config, etc...
-	let canvas = document.getElementById("gameCanvas");
+	const canvas = document.getElementById("gameCanvas");
+	const gameBackgroundCanvas = document.getElementById('gameBackgroundCanvas');
 
-	var container = document.getElementById('canvas');
 	let ctx = canvas.getContext("2d");
+	let ctx0 = gameBackgroundCanvas.getContext("2d");
 	canvas.addEventListener("mousemove", activateDrag);
 	canvas.addEventListener("mousedown", mouseDown);
 	canvas.addEventListener("mouseup", mouseUp);
 	canvas.addEventListener("wheel", zoom);
 	let oldStates = [];
 
+	let ab = true; // debug trash
 	let running = false;
+	let lastCellSize = null; // we need this to know when we need to redraw the background grid.
+
+	
+
+	function fitToContainer(canvas){
+		// Make it visually fill the positioned parent
+		canvas.style.width ='100%';
+		canvas.style.height='100%';
+		// ...then set the internal size to match
+		canvas.width  = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+		console.log('newwidth', canvas.width);
+		console.log('newheight', canvas.height);
+	}
+	fitToContainer(canvas);
+	fitToContainer(gameBackgroundCanvas);
 
 	//// Setup for testing...
 	let aCoupleDots = [
@@ -98,9 +130,17 @@ console.time("its");
 
 
 	const StateProtoType = {
-		cellSize: cfg.initialCellSize,
+		privateCellSize: cfg.initialCellSize,
 		xShift: null,
 		yShift: null,
+		get cellSize() {
+			return this.privateCellSize;
+		},
+		set cellSize(newSize) {
+			this.privateCellSize = newSize;
+			cellSizeInput.value = newSize;
+			cellSizeOutput.value = newSize + 'px';
+		},
 		get gridWidth() {
 			return Math.floor(canvas.width / this.cellSize)
 		},
@@ -372,33 +412,38 @@ console.time("its");
 		drawState();
 	}
 
-	function checkReduceCellSize(decreased = false, zoom = false) {
+	function checkReduceCellSize(decreased = false, zoom = false, targetSize = null) {
 		if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
 			// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-			let newCellSize = state.cellSize / 2;
+			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize - 1 : state.cellSize / 2;
 			if (newCellSize >= cfg.minimumCellSize) {
 				state.changeCellSizeTo(newCellSize);
-				return checkReduceCellSize(true);
+				if (targetSize != null)
+					return checkReduceCellSize(true);
+				else
+					return true;
 			}
 		}
 		return decreased;
 	}
 
-	function checkIncreaseCellSize(increased = false, zoom = false) {
-		if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize)) / 2) - 5)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize)) / 2) - 5))))) {
+	function checkIncreaseCellSize(increased = false, zoom = false, targetSize = null) {
+		if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize)) / 2) - 10)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize)) / 2) - 10))))) {
 			// if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
-			let newCellSize = state.cellSize * 2;
+			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize + 1 : state.cellSize * 2;
 			if (newCellSize <= cfg.maximumCellSize) {
 				state.changeCellSizeTo(newCellSize);
-				return checkIncreaseCellSize(true);
+				if (targetSize != null)
+					return checkIncreaseCellSize(true);
+				else
+					return true;
 			}
 		}
 		return increased;
 	}
 
 	function cellSizeByInput() {
-		let newCellSize = Math.pow(2, cellSizeInput.value); // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
-		cellSizeOutput.value = newCellSize + 'px';
+		let newCellSize = cellSizeInput.value;
 		cfg.shiftLock = true;
 		zoomTo(newCellSize);
 	}
@@ -414,12 +459,10 @@ console.time("its");
 		else
 			event["deltaY"] = -100; // zoom in
 
-		while (state.cellSize != newCellSize) {
-			zoom(event);
-		}
+		zoom(event, newCellSize);
 	}
 
-	function zoom(event) {
+	function zoom(event, targetSize = null) {
 		if (!cfg.shiftLock)
 			shiftLockToggle();
 		let zoomIn = (event.deltaY < 0) ? true : false; // true for zoom in, false for zoom out
@@ -427,7 +470,7 @@ console.time("its");
 		if (zoomIn && (state.cellSize < cfg.maximumCellSize)) { // zoom in
 			let m = {}; // will contain an x and y cell location relative to canvas grid (unshifted)
 			getMouseCoordinate(event, m);
-			checkIncreaseCellSize(false, true);
+			checkIncreaseCellSize(false, true, targetSize);
 			let xShiftChange = Math.floor(m.x - (state.gridWidth / 2)); // shift the left edge of the visible grid to the mouse position, minus half the new grid's width (centering the mouse position)
 			let yShiftChange = Math.floor(m.y - (state.gridHeight / 2));
 			state.xShift = state.xShift - xShiftChange;
@@ -436,7 +479,7 @@ console.time("its");
 		} else if (!zoomIn && state.cellSize > cfg.minimumCellSize) { // zoom out
 			let oldGridWidth = state.gridWidth;
 			let oldGridHeight = state.gridHeight;
-			checkReduceCellSize(false, true);
+			checkReduceCellSize(false, true, targetSize);
 			let newGridWidth = state.gridWidth;
 			let newGridHeight = state.gridHeight;
 			let xShiftChange = Math.floor((newGridWidth - oldGridWidth) / 2); // shift the left edge of the visible grid by the increased number of cells to the left.
@@ -500,8 +543,36 @@ console.time("its");
 			if (!checkReduceCellSize())
 				checkIncreaseCellSize()
 		}
+		console.log('draw');
+		// draw background grid
+		if (cfg.gridEnabled){
+			if (state.cellSize <= 3){  // don't draw a grid for tiny cells
+				if (lastCellSize != null){
+					lastCellSize = null;
+					ctx0.clearRect(0, 0, canvas.width, canvas.height);
+				}
+			} else if (lastCellSize != state.cellSize){
+				ctx0.clearRect(0, 0, canvas.width, canvas.height);
+				lastCellSize = state.cellSize;
+				ctx0.beginPath();
+				ctx0.strokeStyle = cfg.gridStyle.color;
+				let canvasCellsWide = Math.floor(canvas.width / state.cellSize);
+				let canvasCellsTall = Math.floor(canvas.height / state.cellSize)
+				for (let i = 1; i <= canvasCellsWide; i++){
+					let x = state.cellSize * i - 0.5;
+					ctx0.moveTo(x, 0);
+					ctx0.lineTo(x, canvas.height);
+				}
+				for (let i = 1; i <= canvasCellsTall; i++){
+					let y = state.cellSize * i - 0.5;
+					ctx0.moveTo(0, y);
+					ctx0.lineTo(canvas.width, y);
+				}
+				ctx0.stroke();
+			}
+		}
 
-		// draw cells killed since last state
+		// draw cells killed since last stepState
 		if (cfg.deadCellType != 0) {
 			if (cfg.killedFadeOut) {
 				for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
@@ -511,23 +582,34 @@ console.time("its");
 				}
 			}
 		}
-
+		console.log('about to draw live cells');
 		for (let i = 0; i < state.x.length; i++) { // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
 			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
 		}
 	}
 
+	
 	function drawLiveCell(x, y) { // not sure if passing in an integer (cellsize) creates a copy. May be more efficient to refer to state.cellSize each time.
 		let size = state.cellSize;
-		if (size > 4) { // for large cells, use a bordered cell.
+		let gridOffset = (cfg.gridEnabled)? -1.0 : 0.0;
+		if (size > 4 && cfg.cellStyle.outlineThick != 0) { // for large cells, use a bordered cell.
 			ctx.fillStyle = cfg.cellStyle.outlineColor;
 			ctx.fillRect(x * size, y * size, size, size);
 			ctx.fillStyle = cfg.cellStyle.bodyColor;
 			let w = cfg.cellStyle.outlineThick;
 			ctx.fillRect(x * size + w, y * size + w, size - 2 * w, size - 2 * w);
 		} else { // for small cells, fill entire cell with body color (no outline, grid space)
+			console.log('lvie cell');
 			ctx.fillStyle = cfg.cellStyle.bodyColor;
-			ctx.fillRect(x * size, y * size, size, size);
+			if (ab){
+				ctx.fillRect(x * size, y * size, size + gridOffset, size + gridOffset);
+				console.log('cell at ', x * size, y * size, (size + gridOffset), size + gridOffset);
+			}
+			else {
+				ctx.fillRect(x * size, y * size, size, size);
+				console.log('cell at ', x * size, y * size, size, size)
+			}
+			ab = !ab;
 		}
 	}
 
