@@ -30,8 +30,16 @@ p {
 }
 #toggles {
   display: inline-block;
+  width: 210px;
+  margin: 5px auto auto;
   background-color: #dddddd;
   text-align: left;
+}
+label {
+  margin: auto auto auto 0.3em;
+}
+input[type="range"] {
+  width: 60px;
 }
 
 #canvasStack{
