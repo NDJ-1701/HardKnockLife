@@ -424,8 +424,8 @@ console.time("its");
 		state.setComments(newState.comments);
 		console.log('loaded matrix', state.matrix);
 		drawState();
-		if (state.cellSize > 8)
-			zoomTo(8);
+		if (state.cellSize > cfg.initialCellSize)
+			zoomTo(cfg.initialCellSize);
 		cfg.shiftLock = shiftState;
 
 		state.save();
