@@ -3,7 +3,7 @@ bugs:
 	scrolling web page will cause zoom to occur. Perhaps we should make the user hold shift or something when mouse wheel zooming.
 	resizing the window after initial canvas setup will distort cell sizes.
 	hitting random after resizing cells forces cell size back to 8 pixes. Should leave cell size alone.
-	borders/husks are dithered, grid is not sharp
+	when cell sizes get very small, they may disappear etc. Make sure 1 pixel cells works as intended in all display modes.
 
 questions / comments:
 	let newCellSize = cellSizeInput.value; // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
@@ -40,6 +40,11 @@ enhancements:
 	fading canvases as they get lower on the stack. This is almost certianly more efficeint than keeping track of and drawing individual cells.
 
 	all config defaults should load the visible checkbox/slider states.
+
+	it would be neat to have a (probably resource intensive) feature where cells are color coded based on attributes (rule states, for instance), like "going to be killed" (has 3+ neighbors),
+	has been alive for more than a generation, etc.
+
+	it may improve efficeincy to cull dead cells from the dead cell list when a live cell enters it's spot, when drawing multiple dead cell generations, but probably not.
     
 */
 ////// Conway's game of life
@@ -47,26 +52,27 @@ console.time("its");
 
 { // Um, is that block really all I have to do to scope all my variables.?
 	let cfg = {
-		initialCellSize: 8, // valid cell sizes are: 1,2,4,8,16,32,64
+		initialCellSize: 12, // valid cell sizes are: 1,2,4,8,16,32,64
 		maximumCellSize: 64,
 		minimumCellSize: 1,
 		tickRate: 250,
 		cellStyle: {
 			bodyColor: 'black',
-			outlineColor: 'green', //'rgb(173, 216, 230)', //'lightblue'
+			outlineColor: 'gray',
 			// Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
 			// I only changed this for fun, but would prefer it to be clear. Can't remember how.
 			outlineEnabled: true,
-			outlineThick: 1
+			outlineThick: 1 // 0 is not a valid input. Currently 1 to 5 is acceptable. Does not vary with cell size.
 		},
 		gridEnabled: true,
 		get gridOffset(){
 			return (this.gridEnabled)? 1 : 0;
 		},
 		gridStyle: {
-			color: "red"
+			color: 'rgba(250, 79, 0, 0.568)'
 		},
 		deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
+		shadowColor: 'rgb(204, 204, 0)',
 		deadCellTypes: { // this is just a convenience feature
 			shadows: 1,
 			husks: 2
@@ -613,21 +619,15 @@ console.time("its");
 			ctx0.clearRect(0, 0, canvas.width, canvas.height);
 		}
 
-		// draw cells killed since last stepState as shadows
-		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell,
-		// for that reason they must be drawn first so they can be drawn over (in the case of shadows).
-		if (cfg.deadCellType == cfg.deadCellTypes.shadows) {
+		// draw cells killed since last stepState (cells may repeat for multiple generations)
+		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell / or already drawn dead cell,
+		// for that reason they must be drawn first so they can be drawn over by live cells.
+		if (cfg.deadCellType > 0){
 			drawAllDeadCells();
 		}
 
 		for (let i = 0; i < state.x.length; i++) { // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
 			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
-		}
-
-		// draw dead cells killed since last stepstate as husks
-		// husks are essentially borders, and would be drawn over by full cells. I chose to have husks from previous generations coexist with live cells, by drawing over them
-		if (cfg.deadCellType == cfg.deadCellTypes.husks) {
-			drawAllDeadCells();
 		}
 	}
 
@@ -644,13 +644,12 @@ console.time("its");
 
 	function drawWholeCell(x, y){
 		let size = state.cellSize;
-		console.log('cfg.gridoff', cfg.gridOffset);
 		ctx.fillRect(x * size, y * size, size - cfg.gridOffset, size - cfg.gridOffset); // when a grid is present, the right and lower side of each cell have a 1 pixel line.
 	}
 
 	function drawInnerCell(x, y){ // 1 pixel border on all sides
 		let size = state.cellSize;
-		ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+		ctx.fillRect(x * size + 1, y * size + 1, size - 1 - (cfg.gridOffset * 2), size - 1 - (cfg.gridOffset * 2));
 	}
 	
 	function drawCellBorder(x, y){
@@ -673,7 +672,7 @@ console.time("its");
 	
 	function drawLiveCell(x, y) {
 		ctx.fillStyle = cfg.cellStyle.bodyColor; // simplify code here when done
-		if (state.cellSize > 4 && cfg.cellStyle.outlineThick != 0) { // for large cells, use a bordered cell.
+		if (state.cellSize > 4 && cfg.cellStyle.outlineEnabled) { // for large cells, use a bordered cell.
 			ctx.strokeStyle = cfg.cellStyle.outlineColor;
 			drawCellBorder(x,y);
 			ctx.fillStyle = cfg.cellStyle.bodyColor;
@@ -684,23 +683,22 @@ console.time("its");
 	}
 
 	function drawHusk(x, y, generation){
-		// switch (generation) {
-		// 	case 0:
-		// 		ctx.strokeStyle = "#00000050";
-		// 		break;
-		// 	case 1:
-		// 		ctx.strokeStyle = "#00000010";
-		// 		break;
-		// 	case 2:
-		// 	case 3:
-		// 	case 4:
-		// 	case 5:
-		// 		ctx.strokeStyle = "#00000002";
-		// 		break;
-		// 	default:
-		// 		ctx.strokeStyle = cfg.cellStyle.outlineColor;
-		// }
-		ctx.strokeStyle = "green";
+		switch (generation) {
+			case 0:
+				ctx.strokeStyle = "#00000050";
+				break;
+			case 1:
+				ctx.strokeStyle = "#00000010";
+				break;
+			case 2:
+			case 3:
+			case 4:
+			case 5:
+				ctx.strokeStyle = "#00000002";
+				break;
+			default:
+				ctx.strokeStyle = cfg.cellStyle.outlineColor;
+		}
 		drawCellBorder(x, y);
 	}
 
@@ -710,10 +708,10 @@ console.time("its");
 			let opacity = ((state.deadMatrices.length - generation) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
 			//Numerator above 1.0 keeps opacity higher for longer
 			//e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
-			let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
+			let opaColor = cfg.shadowColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
 			ctx.fillStyle = opaColor;
 		} else
-			ctx.fillStyle = cfg.cellStyle.outlineColor;
+			ctx.fillStyle = cfg.shadowColor;
 		drawWholeCell(x,y);
 	}
 
