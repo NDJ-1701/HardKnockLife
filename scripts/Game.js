@@ -66,10 +66,10 @@ console.time("its");
 		},
 		gridEnabled: true,
 		get gridOffset(){
-			return (this.gridEnabled)? 1 : 0;
+			return (this.gridEnabled && state.cellSize > 3)? 1 : 0;
 		},
 		gridStyle: {
-			color: 'rgba(250, 79, 0, 0.568)'
+			color: 'rgba(0, 0, 0, 0.568)'
 		},
 		deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
 		shadowColor: 'rgb(204, 204, 0)',
