@@ -1,8 +1,23 @@
 /* desired changes:
 bugs:
-    none known
+	scrolling web page will cause zoom to occur. Perhaps we should make the user hold shift or something when mouse wheel zooming.
+	resizing the window after initial canvas setup will distort cell sizes.
+	hitting random after resizing cells forces cell size back to 8 pixes. Should leave cell size alone.
+	borders/husks are dithered, grid is not sharp
+
+questions / comments:
+	let newCellSize = cellSizeInput.value; // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
+
+	I'd like an explanation why we are using JSON for saving the state.
 
 enhancements:
+	start game flow at bottom and move "global" variables next to relevant functions, if they are only used in one place. Currently global variables have to be at the top because
+	drawstate etc is called near the top, before they would otherwise have been defined.
+
+	grid should be darker/lighter every 5 lines
+
+	We should draw a (optional) background grid for each resize.
+
     dead cell fading should not use regex per cell. fade should be precalculated and saved to a variable (once per all cells).
 
     outlines should be made to be one pixel wide, or a configurable preference.
@@ -17,10 +32,15 @@ enhancements:
 
     it may be good to refactor the cell increase to allow for arbitrary cell sizes, and otherwise follow an array of prechosen values. Current math would not allow reaching max or min from a position
     that could not be divided or multiplied by 2 without exceeding the limit. Also, issues might occur in zoom where it would believe that an increase/decrease will occur when it doesn't once in the increase
-    decrease methods.
+	decrease methods.
+	
+	when adding a cell manually, it should not redraw all cells when it could just draw the one.
 
-questions:
-    I'd like an explanation why we are using JSON for saving the state.
+	one way we could/could have done the dead cell fade is by having multiple stacked canvases, and clearing the bottom one and bringing it to the top to put fresh cells on, and progressively
+	fading canvases as they get lower on the stack. This is almost certianly more efficeint than keeping track of and drawing individual cells.
+
+	all config defaults should load the visible checkbox/slider states.
+    
 */
 ////// Conway's game of life
 console.time("its");
@@ -33,12 +53,24 @@ console.time("its");
 		tickRate: 250,
 		cellStyle: {
 			bodyColor: 'black',
-			outlineColor: 'rgb(173, 216, 230)', //'lightblue'
+			outlineColor: 'green', //'rgb(173, 216, 230)', //'lightblue'
 			// Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
 			// I only changed this for fun, but would prefer it to be clear. Can't remember how.
+			outlineEnabled: true,
 			outlineThick: 1
 		},
+		gridEnabled: true,
+		get gridOffset(){
+			return (this.gridEnabled)? 1 : 0;
+		},
+		gridStyle: {
+			color: "red"
+		},
 		deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
+		deadCellTypes: { // this is just a convenience feature
+			shadows: 1,
+			husks: 2
+		},
 		killedFadeOut: 5, // number of steps before final erasure. 0 = feature Off.
 		opacityAging: true,
 		enableUndo: true,
@@ -54,10 +86,11 @@ console.time("its");
 	}
 
 	//// Setup, Config, etc...
-	let canvas = document.getElementById("gameCanvas");
+	const canvas = document.getElementById("gameCanvas");
+	const gameBackgroundCanvas = document.getElementById('gameBackgroundCanvas');
 
-	var container = document.getElementById('canvas');
 	let ctx = canvas.getContext("2d");
+	let ctx0 = gameBackgroundCanvas.getContext("2d");
 	canvas.addEventListener("mousemove", activateDrag);
 	canvas.addEventListener("mousedown", mouseDown);
 	canvas.addEventListener("mouseup", mouseUp);
@@ -65,6 +98,42 @@ console.time("its");
 	let oldStates = [];
 
 	let running = false;
+	let lastCellSize = null; // we need this to know when we need to redraw the background grid.
+	document.getElementById("gridCheckbox").checked = cfg.gridEnabled;
+	let gridOnLastState = false; // check if we need to clear the grid, when toggling.
+
+	
+
+	
+
+	function fitToContainer(canvas){
+		// Make it visually fill the positioned parent
+		canvas.style.width ='100%';
+		canvas.style.height='100%';
+		// ...then set the internal size to match
+		canvas.width  = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+	}
+	fitToContainer(canvas);
+	fitToContainer(gameBackgroundCanvas);
+
+	///
+
+	function gridToggle(){
+		cfg.gridEnabled =  document.getElementById("gridCheckbox").checked;
+		drawState();
+	}
+
+	function outlineToggle(){
+		cfg.cellStyle.outlineEnabled =  document.getElementById("outlineCheckbox").checked; // later this may be better as a slider.
+		drawState();
+	}
+
+	function outlineByInput() {
+		cfg.cellStyle.outlineThick = Number(outlineInput.value);
+		outlineOutput.value = cfg.cellStyle.outlineThick + "px";
+
+	}
 
 	//// Setup for testing...
 	let aCoupleDots = [
@@ -98,9 +167,17 @@ console.time("its");
 
 
 	const StateProtoType = {
-		cellSize: cfg.initialCellSize,
+		privateCellSize: cfg.initialCellSize,
 		xShift: null,
 		yShift: null,
+		get cellSize() {
+			return this.privateCellSize;
+		},
+		set cellSize(newSize) {
+			this.privateCellSize = newSize;
+			cellSizeInput.value = newSize;
+			cellSizeOutput.value = newSize + 'px';
+		},
 		get gridWidth() {
 			return Math.floor(canvas.width / this.cellSize)
 		},
@@ -372,33 +449,38 @@ console.time("its");
 		drawState();
 	}
 
-	function checkReduceCellSize(decreased = false, zoom = false) {
+	function checkReduceCellSize(decreased = false, zoom = false, targetSize = null) {
 		if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
 			// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-			let newCellSize = state.cellSize / 2;
+			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize - 1 : state.cellSize / 2;
 			if (newCellSize >= cfg.minimumCellSize) {
 				state.changeCellSizeTo(newCellSize);
-				return checkReduceCellSize(true);
+				if (targetSize != null)
+					return checkReduceCellSize(true);
+				else
+					return true;
 			}
 		}
 		return decreased;
 	}
 
-	function checkIncreaseCellSize(increased = false, zoom = false) {
-		if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize)) / 2) - 5)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize)) / 2) - 5))))) {
+	function checkIncreaseCellSize(increased = false, zoom = false, targetSize = null) {
+		if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize)) / 2) - 10)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize)) / 2) - 10))))) {
 			// if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
-			let newCellSize = state.cellSize * 2;
+			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize + 1 : state.cellSize * 2;
 			if (newCellSize <= cfg.maximumCellSize) {
 				state.changeCellSizeTo(newCellSize);
-				return checkIncreaseCellSize(true);
+				if (targetSize != null)
+					return checkIncreaseCellSize(true);
+				else
+					return true;
 			}
 		}
 		return increased;
 	}
 
 	function cellSizeByInput() {
-		let newCellSize = Math.pow(2, cellSizeInput.value); // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
-		cellSizeOutput.value = newCellSize + 'px';
+		let newCellSize = Number(cellSizeInput.value);
 		cfg.shiftLock = true;
 		zoomTo(newCellSize);
 	}
@@ -414,12 +496,10 @@ console.time("its");
 		else
 			event["deltaY"] = -100; // zoom in
 
-		while (state.cellSize != newCellSize) {
-			zoom(event);
-		}
+		zoom(event, newCellSize);
 	}
 
-	function zoom(event) {
+	function zoom(event, targetSize = null) {
 		if (!cfg.shiftLock)
 			shiftLockToggle();
 		let zoomIn = (event.deltaY < 0) ? true : false; // true for zoom in, false for zoom out
@@ -427,7 +507,7 @@ console.time("its");
 		if (zoomIn && (state.cellSize < cfg.maximumCellSize)) { // zoom in
 			let m = {}; // will contain an x and y cell location relative to canvas grid (unshifted)
 			getMouseCoordinate(event, m);
-			checkIncreaseCellSize(false, true);
+			checkIncreaseCellSize(false, true, targetSize);
 			let xShiftChange = Math.floor(m.x - (state.gridWidth / 2)); // shift the left edge of the visible grid to the mouse position, minus half the new grid's width (centering the mouse position)
 			let yShiftChange = Math.floor(m.y - (state.gridHeight / 2));
 			state.xShift = state.xShift - xShiftChange;
@@ -436,7 +516,7 @@ console.time("its");
 		} else if (!zoomIn && state.cellSize > cfg.minimumCellSize) { // zoom out
 			let oldGridWidth = state.gridWidth;
 			let oldGridHeight = state.gridHeight;
-			checkReduceCellSize(false, true);
+			checkReduceCellSize(false, true, targetSize);
 			let newGridWidth = state.gridWidth;
 			let newGridHeight = state.gridHeight;
 			let xShiftChange = Math.floor((newGridWidth - oldGridWidth) / 2); // shift the left edge of the visible grid by the increased number of cells to the left.
@@ -501,74 +581,144 @@ console.time("its");
 				checkIncreaseCellSize()
 		}
 
-		// draw cells killed since last state
-		if (cfg.deadCellType != 0) {
-			if (cfg.killedFadeOut) {
-				for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
-					for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
-						drawDeadCell(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
-					}
+		// draw background grid
+		if (cfg.gridEnabled){
+			if (state.cellSize <= 3){  // don't draw a grid for tiny cells
+				if (lastCellSize != null){
+					lastCellSize = null;
+					ctx0.clearRect(0, 0, canvas.width, canvas.height);
 				}
+			} else if (lastCellSize != state.cellSize || gridOnLastState === false){
+				ctx0.clearRect(0, 0, canvas.width, canvas.height);
+				lastCellSize = state.cellSize;
+				ctx0.beginPath();
+				ctx0.strokeStyle = cfg.gridStyle.color;
+				let canvasCellsWide = Math.floor(canvas.width / state.cellSize);
+				let canvasCellsTall = Math.floor(canvas.height / state.cellSize)
+				for (let i = 1; i <= canvasCellsWide; i++){
+					let x = state.cellSize * i - 0.5;
+					ctx0.moveTo(x, 0);
+					ctx0.lineTo(x, canvas.height);
+				}
+				for (let i = 1; i <= canvasCellsTall; i++){
+					let y = state.cellSize * i - 0.5;
+					ctx0.moveTo(0, y);
+					ctx0.lineTo(canvas.width, y);
+				}
+				ctx0.stroke();
 			}
+			gridOnLastState = true;
+		} else if (gridOnLastState) {
+			gridOnLastState = false;
+			ctx0.clearRect(0, 0, canvas.width, canvas.height);
+		}
+
+		// draw cells killed since last stepState as shadows
+		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell,
+		// for that reason they must be drawn first so they can be drawn over (in the case of shadows).
+		if (cfg.deadCellType == cfg.deadCellTypes.shadows) {
+			drawAllDeadCells();
 		}
 
 		for (let i = 0; i < state.x.length; i++) { // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
 			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
 		}
-	}
 
-	function drawLiveCell(x, y) { // not sure if passing in an integer (cellsize) creates a copy. May be more efficient to refer to state.cellSize each time.
-		let size = state.cellSize;
-		if (size > 4) { // for large cells, use a bordered cell.
-			ctx.fillStyle = cfg.cellStyle.outlineColor;
-			ctx.fillRect(x * size, y * size, size, size);
-			ctx.fillStyle = cfg.cellStyle.bodyColor;
-			let w = cfg.cellStyle.outlineThick;
-			ctx.fillRect(x * size + w, y * size + w, size - 2 * w, size - 2 * w);
-		} else { // for small cells, fill entire cell with body color (no outline, grid space)
-			ctx.fillStyle = cfg.cellStyle.bodyColor;
-			ctx.fillRect(x * size, y * size, size, size);
+		// draw dead cells killed since last stepstate as husks
+		// husks are essentially borders, and would be drawn over by full cells. I chose to have husks from previous generations coexist with live cells, by drawing over them
+		if (cfg.deadCellType == cfg.deadCellTypes.husks) {
+			drawAllDeadCells();
 		}
 	}
 
-	function drawDeadCell(x, y, m) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
-		let size = state.cellSize;
-		if (cfg.deadCellType == 2) { // husks
-			ctx.beginPath();
-			ctx.rect(x * size, y * size, size, size);
-			switch (m) {
-				case 0:
-					ctx.strokeStyle = "#00000050";
-					break;
-				case 1:
-					ctx.strokeStyle = "#00000010";
-					break;
-				case 2:
-				case 3:
-				case 4:
-				case 5:
-					ctx.strokeStyle = "#00000002";
-					break;
+	function drawAllDeadCells(){
+		for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
+			for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
+				if (cfg.deadCellType == cfg.deadCellTypes.shadows)
+					drawShadow(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+				if (cfg.deadCellType == cfg.deadCellTypes.husks)
+					drawHusk(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
 			}
-			ctx.lineWidth = 1;
-			ctx.stroke()
-		} else if (cfg.deadCellType == 1) { // shadows
-			// this section needs to be changed in order to get better efficiency.
-			if (cfg.opacityAging) {
-				let opacity = ((state.deadMatrices.length - m) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
-				//Numerator above 1.0 keeps opacity higher for longer
-				//e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
-				let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
-				ctx.fillStyle = opaColor;
-			} else
-				ctx.fillStyle = cfg.cellStyle.outlineColor;
-			let w = cfg.cellStyle.outlineThick; // draw body-sized square but with the other color
-			ctx.fillRect(x * size + w, y * size + w, size - 2 * w, size - 2 * w);
 		}
+	}
+
+	function drawWholeCell(x, y){
+		let size = state.cellSize;
+		console.log('cfg.gridoff', cfg.gridOffset);
+		ctx.fillRect(x * size, y * size, size - cfg.gridOffset, size - cfg.gridOffset); // when a grid is present, the right and lower side of each cell have a 1 pixel line.
+	}
+
+	function drawInnerCell(x, y){ // 1 pixel border on all sides
+		let size = state.cellSize;
+		ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+	}
+	
+	function drawCellBorder(x, y){
+		let size = state.cellSize;
+		
+		let outLineW = cfg.cellStyle.outlineThick;
+		ctx.lineWidth = ((state.cellSize + 2) > (outLineW * 2))? outLineW : 1; // prevent outline from being larger than cell, or filling in cell.
+			ctx.beginPath();
+			if (cfg.gridEnabled){
+				ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - 1 - outLineW, size - 1 - outLineW);
+			}
+			else{
+				ctx.lineWidth = 1;
+				ctx.rect(x * size + 0.5, y * size + 0.5, size, size);
+			}
+			ctx.stroke()
+		
+	}
+
+	
+	function drawLiveCell(x, y) {
+		ctx.fillStyle = cfg.cellStyle.bodyColor; // simplify code here when done
+		if (state.cellSize > 4 && cfg.cellStyle.outlineThick != 0) { // for large cells, use a bordered cell.
+			ctx.strokeStyle = cfg.cellStyle.outlineColor;
+			drawCellBorder(x,y);
+			ctx.fillStyle = cfg.cellStyle.bodyColor;
+			drawInnerCell(x,y);
+		} else { // for small cells, fill entire cell with body color (no outline, grid space)
+			drawWholeCell(x,y);
+		}
+	}
+
+	function drawHusk(x, y, generation){
+		// switch (generation) {
+		// 	case 0:
+		// 		ctx.strokeStyle = "#00000050";
+		// 		break;
+		// 	case 1:
+		// 		ctx.strokeStyle = "#00000010";
+		// 		break;
+		// 	case 2:
+		// 	case 3:
+		// 	case 4:
+		// 	case 5:
+		// 		ctx.strokeStyle = "#00000002";
+		// 		break;
+		// 	default:
+		// 		ctx.strokeStyle = cfg.cellStyle.outlineColor;
+		// }
+		ctx.strokeStyle = "green";
+		drawCellBorder(x, y);
+	}
+
+	function drawShadow(x, y, generation) { // this choice of color/style is not necessarily my preference, it's decent, but i chose it for convenience.
+		// this section needs to be changed in order to get better efficiency.
+		if (cfg.opacityAging) {
+			let opacity = ((state.deadMatrices.length - generation) / state.deadMatrices.length).toFixed(2); // equal fade spread across the aging matrices.
+			//Numerator above 1.0 keeps opacity higher for longer
+			//e.g. lightblue i.e. 'rgb(173, 216, 230)' m = 0 converts to 'rgba(173, 216, 230, 0.13)'
+			let opaColor = cfg.cellStyle.outlineColor.replace(/rgb\((.+)\)/, "rgba($1, " + opacity + ")");
+			ctx.fillStyle = opaColor;
+		} else
+			ctx.fillStyle = cfg.cellStyle.outlineColor;
+		drawWholeCell(x,y);
 	}
 
 	function tickrateByInput() {
-		let newTickrate = Math.round(1000 / Math.pow(2, tickrateInput.value));
+		let newTickrate = Math.round(1000 / Math.pow(2, Number(tickrateInput.value)));
 		tickrateOutput.value = newTickrate + "ms"
 		cfg.tickRate = newTickrate;
 	}
@@ -762,4 +912,4 @@ console.time("its");
 
 } // Um, is that block really all I have to do to scope all my variables.?
 
-console.timeEnd("its");
+//console.timeEnd("its");
