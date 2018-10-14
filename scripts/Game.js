@@ -55,23 +55,31 @@ console.time("its");
 		initialCellSize: 12, // valid cell sizes are: 1,2,4,8,16,32,64
 		maximumCellSize: 64,
 		minimumCellSize: 1,
-		tickRate: 250,
+		defaultTickRate: 250, // must be either: 4000, 2000, 1000, 500, 250, 125, 63, 31, 16, 8, 4, 2
+		get tickRate(){
+			return this.defaultTickRate;
+		},
+		set tickRate(value){
+			tickrateInput.value = Math.round(Math.log2( 1000 / value ));
+			tickrateOutput.value = value + "ms";
+			this.defaultTickRate = value;
+		},
 		cellStyle: {
 			bodyColor: 'black',
-			outlineColor: 'gray',
+			outlineColor: 'lightgray',
 			// Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
 			// I only changed this for fun, but would prefer it to be clear. Can't remember how.
 			outlineEnabled: true,
-			outlineThick: 1 // 0 is not a valid input. Currently 1 to 5 is acceptable. Does not vary with cell size.
+			outlineThick: 1 // 0 is not a valid input. Currently 1 to 5 is acceptable. Does not vary with cell size. used for husks and live cells.
 		},
-		gridEnabled: true,
+		gridEnabled: false,
 		get gridOffset(){
 			return (this.gridEnabled && state.cellSize > 3)? 1 : 0;
 		},
 		gridStyle: {
 			color: 'rgba(0, 0, 0, 0.568)'
 		},
-		deadCellType: 0, // 0: no residue, 1: shadows, 2: husks
+		deadCellType: 1, // 0: no residue, 1: shadows, 2: husks
 		shadowColor: 'rgb(204, 204, 0)',
 		deadCellTypes: { // this is just a convenience feature
 			shadows: 1,
@@ -81,49 +89,18 @@ console.time("its");
 		opacityAging: true,
 		enableUndo: true,
 		maxUndo: 20,
-		sL: false,
+		sL: true, // Set default here. Autozoom = true is shiftlock false
 		get shiftLock() {
 			return this.sL;
 		},
 		set shiftLock(lock) {
+			console.log('triggered');
 			document.getElementById("autoZoom").checked = !lock;
 			this.sL = lock;
 		}
 	}
 
-	//// Setup, Config, etc...
-	const canvas = document.getElementById("gameCanvas");
-	const gameBackgroundCanvas = document.getElementById('gameBackgroundCanvas');
-
-	let ctx = canvas.getContext("2d");
-	let ctx0 = gameBackgroundCanvas.getContext("2d");
-	canvas.addEventListener("mousemove", activateDrag);
-	canvas.addEventListener("mousedown", mouseDown);
-	canvas.addEventListener("mouseup", mouseUp);
-	canvas.addEventListener("wheel", zoom);
-	let oldStates = [];
-
-	let running = false;
-	let lastCellSize = null; // we need this to know when we need to redraw the background grid.
-	document.getElementById("gridCheckbox").checked = cfg.gridEnabled;
-	let gridOnLastState = false; // check if we need to clear the grid, when toggling.
-
-	
-
-	
-
-	function fitToContainer(canvas){
-		// Make it visually fill the positioned parent
-		canvas.style.width ='100%';
-		canvas.style.height='100%';
-		// ...then set the internal size to match
-		canvas.width  = canvas.offsetWidth;
-		canvas.height = canvas.offsetHeight;
-	}
-	fitToContainer(canvas);
-	fitToContainer(gameBackgroundCanvas);
-
-	///
+	//// Settings functions
 
 	function gridToggle(){
 		cfg.gridEnabled =  document.getElementById("gridCheckbox").checked;
@@ -138,10 +115,18 @@ console.time("its");
 	function outlineByInput() {
 		cfg.cellStyle.outlineThick = Number(outlineInput.value);
 		outlineOutput.value = cfg.cellStyle.outlineThick + "px";
-
+		drawState();
 	}
 
-	//// Setup for testing...
+	function shiftLockToggle() {
+		cfg.shiftLock = !(document.getElementById("autoZoom").checked);  
+	}
+
+	function changeResidueType() {
+		cfg.deadCellType = document.querySelector('input[name="residues"]:checked').value;
+	}
+
+	//// A few initial states to show on load:
 	let aCoupleDots = [
 		[10, 10, 11, 11],
 		[10, 11, 10, 11]
@@ -149,6 +134,11 @@ console.time("its");
 	let gosperGliderGun = [
 		[14, 14, 15, 15, 24, 24, 24, 25, 26, 27, 25, 26, 27, 29, 30, 30, 30, 31, 29, 28, 34, 34, 34, 35, 35, 35, 36, 36, 38, 38, 38, 38, 48, 49, 49, 48],
 		[21, 22, 22, 21, 21, 22, 23, 20, 19, 19, 24, 25, 25, 24, 23, 22, 21, 22, 20, 22, 21, 20, 19, 19, 20, 21, 18, 22, 17, 18, 22, 23, 20, 20, 19, 19]
+	];
+
+	let fourLightSpaceships = [
+		[5, 5, 5, 6, 6, 7, 8, 9, 9, 41, 41, 41, 41, 40, 39, 38, 40, 38, 69, 70, 71, 72, 72, 72, 71, 68, 68, 42, 42, 42, 42, 41, 40, 39, 41, 39],
+		[26, 27, 28, 29, 26, 26, 26, 27, 29, 4, 5, 6, 7, 4, 4, 5, 8, 8, 27, 27, 27, 27, 28, 29, 30, 28, 30, 52, 53, 54, 55, 55, 55, 54, 51, 51]
 	];
 
 	// includes gosper glider gun, figure 8 oscillator, and pulsar.
@@ -160,17 +150,10 @@ console.time("its");
 		[21, 22, 22, 21, 20, 19, 19, 20, 21, 22, 24, 23, 24, 25, 25, 22, 25, 25, 26, 27, 26, 17, 18, 18, 17, 19, 20, 21, 22, 22, 23, 23, 19, 21, 18, 21, 21, 21, 19, 20, 21, 19, 20, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 43, 42, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 42, 43, 46, 46, 46, 48, 47, 49, 47, 49, 48, 51, 51, 51, 46, 47, 46, 46, 49, 48, 47, 48, 49, 51, 51, 51, 34, 34, 35, 34, 35, 36, 38, 36, 38, 39, 39, 41, 41, 42, 42, 43, 43, 43, 7, 8, 8, 7, 7, 8, 9, 9, 9, 10, 10, 10, 11, 12, 11, 12, 12, 11]
 	];
 
-	let fourLightSpaceships = [
-		[5, 5, 5, 6, 6, 7, 8, 9, 9, 41, 41, 41, 41, 40, 39, 38, 40, 38, 69, 70, 71, 72, 72, 72, 71, 68, 68, 42, 42, 42, 42, 41, 40, 39, 41, 39],
-		[26, 27, 28, 29, 26, 26, 26, 27, 29, 4, 5, 6, 7, 4, 4, 5, 8, 8, 27, 27, 27, 27, 28, 29, 30, 28, 30, 52, 53, 54, 55, 55, 55, 54, 51, 51]
-	];
-
+	//// our main state object and prototype
 
 	let initialSetupComments = variousInitialStateComments;
 	let initialSetup = variousInitialState;
-	let empty = [];
-
-
 
 	const StateProtoType = {
 		privateCellSize: cfg.initialCellSize,
@@ -242,18 +225,9 @@ console.time("its");
 			this.x = dualArray[0].slice();
 			this.y = dualArray[1].slice();
 		},
-		// get deadMatrix () {
-		//     return [this.xDead, this.yDead];
-		// },
-		// set deadMatrix (dualArray) {
-		//     this.xDead = dualArray[0];
-		//     this.yDead = dualArray[1];
-		// },
 		push: function(x, y) { // adds and xy pair and sets mins and maxes if necessary.
-			//if (x > 0 && y > 0 && x <= this.gridWidth && y <= this.gridHeight) { // i scout salute my fingers and swear to remove this when we have zoom
 			this.x.push(x);
 			this.y.push(y);
-			//}
 			if (x < this.xMin || (this.xMin === null))
 				this.xMin = x;
 			if (x > this.xMax || (this.xMax === null))
@@ -310,6 +284,16 @@ console.time("its");
 			this.xShift = this.savedXShift;
 			this.yShift = this.savedYShift;
 			this.cellSize = this.savedCellSize;
+		},
+		clear: function(){
+			this.matrix = [
+				[],
+				[]
+			];
+			this.deadMatrices = [];
+			this.minMaxes = [undefined, undefined, undefined, undefined];
+			this.xShift = 0;
+			this.yShift = 0;
 		}
 	};
 
@@ -317,12 +301,8 @@ console.time("its");
 		let s = Object.create(StateProtoType);
 
 		s.comments = ''; // this should be an html string
-		//this.x = initialSetup[0].slice();
-		//this.y = initialSetup[1].slice();
 		s.x = [];
 		s.y = [];
-		// s.xDead = [];
-		// s.yDead = [];
 		s.deadMatrices = [];
 		s.xMin = null;
 		s.xMax = null;
@@ -339,16 +319,9 @@ console.time("its");
 		return s;
 	}
 
-	//// Game flow starts here...
-	let state = new State(true);
-	drawState();
+	//// Game functions
 
-	//// ... User interaction ...
-	//// Game flow ends here...
-
-	//// Library of custom functions...
-
-	/// util function to get random integer
+	/// return random integer
 	function getRandomInt(max) {
 		return Math.floor(Math.random() * Math.floor(max));
 	}
@@ -388,44 +361,24 @@ console.time("its");
 		drawState();
 	}
 
-	//// these functions could be moved into StatePrototype
-	//
-	function clearState() {
-			state.matrix = [
-				[],
-				[]
-			];
-			state.deadMatrices = [];
-			state.minMaxes = [undefined, undefined, undefined, undefined];
-			state.xShift = 0;
-			state.yShift = 0;
-			drawState();
-		}
-		//
-	function resetState() {
-			//state.init(); // Max used the reset function instead
-			state.reset();
-			drawState();
-		}
-		//
-	function saveState() { // state.save() can't be called in the html button onclick because all these variables are intentionally block scoped. Though I don't really understand why the functions aren't scoped out also.
-			state.save();
-			state.setComments("SavePoint of:  " + document.getElementById('comments').innerHTML)
-		}
-		////
+	function resetButton() {
+		state.reset();
+		drawState();
+	}
 
 	function loadPattern() {
-		clearState();
-		let shiftState = cfg.shiftLock;
+		state.clear();
+		let shiftState = cfg.shiftLock; // save the setting so we can set it back
 		cfg.shiftLock = false;
 		const newState = new State();
 		parseRLE(patternsArray[getRandomInt(patternsArray.length - 1)], newState);
 		state.init(newState.matrix);
 		state.setComments(newState.comments);
 		console.log('loaded matrix', state.matrix);
-		drawState();
 		if (state.cellSize > cfg.initialCellSize)
-			zoomTo(cfg.initialCellSize);
+			zoomTo(cfg.initialCellSize); // internally will draw the state.
+		else
+			drawState();
 		cfg.shiftLock = shiftState;
 
 		state.save();
@@ -456,15 +409,19 @@ console.time("its");
 	}
 
 	function checkReduceCellSize(decreased = false, zoom = false, targetSize = null) {
-		if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
-			// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize - 1 : state.cellSize / 2;
-			if (newCellSize >= cfg.minimumCellSize) {
-				state.changeCellSizeTo(newCellSize);
-				if (targetSize != null)
-					return checkReduceCellSize(true);
-				else
-					return true;
+		if (state.cellSize != 1){
+			if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
+				// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
+				let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize - 1 : state.cellSize / 2;
+				if (newCellSize < 2)
+					newCellSize = 1;
+				if (newCellSize >= cfg.minimumCellSize) {
+					state.changeCellSizeTo(newCellSize);
+					if (targetSize != null)
+						return checkReduceCellSize(true);
+					else
+						return true;
+				}
 			}
 		}
 		return decreased;
@@ -506,8 +463,7 @@ console.time("its");
 	}
 
 	function zoom(event, targetSize = null) {
-		if (!cfg.shiftLock)
-			shiftLockToggle();
+		cfg.shiftLock = true;
 		let zoomIn = (event.deltaY < 0) ? true : false; // true for zoom in, false for zoom out
 
 		if (zoomIn && (state.cellSize < cfg.maximumCellSize)) { // zoom in
@@ -563,8 +519,7 @@ console.time("its");
 	}
 
 	function dragEnd(event) {
-		if (!cfg.shiftLock)
-			shiftLockToggle();
+		cfg.shiftLock = true;
 		const dragEndPosition = {};
 		getMouseCoordinate(event, dragEndPosition);
 		// get cell # difference between drag start pos and end pos, this will be the change in shift value.
@@ -575,19 +530,10 @@ console.time("its");
 		drawState();
 	}
 
-	// Library of custom functions...
-	function drawState() {
-		// erase last canvas/cells.
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-		// set new cell size and shift value
-		if (!cfg.shiftLock) {
-			state.checkResetShiftValues();
-			if (!checkReduceCellSize())
-				checkIncreaseCellSize()
-		}
-
-		// draw background grid
+	// for drawing background grid
+	let lastCellSize = null; // we need this to know when we need to redraw the background grid.
+	let gridOnLastState = false; // check if we need to clear the grid, when toggling.
+	function drawGrid(){
 		if (cfg.gridEnabled){
 			if (state.cellSize <= 3){  // don't draw a grid for tiny cells
 				if (lastCellSize != null){
@@ -618,28 +564,6 @@ console.time("its");
 			gridOnLastState = false;
 			ctx0.clearRect(0, 0, canvas.width, canvas.height);
 		}
-
-		// draw cells killed since last stepState (cells may repeat for multiple generations)
-		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell / or already drawn dead cell,
-		// for that reason they must be drawn first so they can be drawn over by live cells.
-		if (cfg.deadCellType > 0){
-			drawAllDeadCells();
-		}
-
-		for (let i = 0; i < state.x.length; i++) { // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
-			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
-		}
-	}
-
-	function drawAllDeadCells(){
-		for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
-			for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
-				if (cfg.deadCellType == cfg.deadCellTypes.shadows)
-					drawShadow(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
-				if (cfg.deadCellType == cfg.deadCellTypes.husks)
-					drawHusk(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
-			}
-		}
 	}
 
 	function drawWholeCell(x, y){
@@ -647,7 +571,7 @@ console.time("its");
 		ctx.fillRect(x * size, y * size, size - cfg.gridOffset, size - cfg.gridOffset); // when a grid is present, the right and lower side of each cell have a 1 pixel line.
 	}
 
-	function drawInnerCell(x, y){ // 1 pixel border on all sides
+	function drawInnerCell(x, y){ // 1 pixel border on all sides -> does not yet account for border thickness; for now I'm not using, may use later if for some reason I don't want this to draw over borders
 		let size = state.cellSize;
 		ctx.fillRect(x * size + 1, y * size + 1, size - 1 - (cfg.gridOffset * 2), size - 1 - (cfg.gridOffset * 2));
 	}
@@ -669,36 +593,38 @@ console.time("its");
 		
 	}
 
-	
-	function drawLiveCell(x, y) {
-		ctx.fillStyle = cfg.cellStyle.bodyColor; // simplify code here when done
-		if (state.cellSize > 4 && cfg.cellStyle.outlineEnabled) { // for large cells, use a bordered cell.
-			ctx.strokeStyle = cfg.cellStyle.outlineColor;
-			drawCellBorder(x,y);
-			ctx.fillStyle = cfg.cellStyle.bodyColor;
-			drawInnerCell(x,y);
-		} else { // for small cells, fill entire cell with body color (no outline, grid space)
-			drawWholeCell(x,y);
-		}
-	}
-
 	function drawHusk(x, y, generation){
+		//// various intesities of yellow
 		switch (generation) {
 			case 0:
-				ctx.strokeStyle = "#00000050";
+				ctx.strokeStyle = "rgba(244, 204, 0, 1";
 				break;
 			case 1:
-				ctx.strokeStyle = "#00000010";
-				break;
 			case 2:
 			case 3:
 			case 4:
 			case 5:
-				ctx.strokeStyle = "#00000002";
+				ctx.strokeStyle = "rgba(204, 204, 0, .4)";
 				break;
 			default:
 				ctx.strokeStyle = cfg.cellStyle.outlineColor;
 		}
+		//// green, yellow and red. looks ok
+		// switch (generation) {
+		// 	case 0:
+		// 		ctx.strokeStyle = "rgba(160, 255, 60, 1)";
+		// 		break;
+		// 	case 1:
+		// 		ctx.strokeStyle = "rgba(255, 200, 0, .9)";
+		// 		break;
+		// 	case 2:
+		// 	case 3:
+		// 	case 4:
+		// 	case 5:
+		// 		ctx.strokeStyle = "rgba(210, 0, 0, .2)";
+		// 		break;
+		// 	default:
+		// }
 		drawCellBorder(x, y);
 	}
 
@@ -715,9 +641,59 @@ console.time("its");
 		drawWholeCell(x,y);
 	}
 
+	
+	function drawAllDeadCells(){
+		for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
+			for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
+				if (cfg.deadCellType == cfg.deadCellTypes.shadows)
+					drawShadow(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+				if (cfg.deadCellType == cfg.deadCellTypes.husks)
+					drawHusk(state.deadMatrices[m][0][i] + state.xShift, state.deadMatrices[m][1][i] + state.yShift, m); // passing the x, y and m = the index of the matrix in deadMatrices to control opacity
+			}
+		}
+	}
+	
+	function drawLiveCell(x, y) {
+		ctx.fillStyle = cfg.cellStyle.bodyColor;
+		if (state.cellSize > 4 && cfg.cellStyle.outlineEnabled) { // for large cells, use a bordered cell.
+			//drawInnerCell(x,y); // inner cell needs to be drawn first, because this does not account for border thickness.
+			drawWholeCell(x,y);
+			ctx.strokeStyle = cfg.cellStyle.outlineColor;
+			drawCellBorder(x,y);
+		} else { // for small cells, fill entire cell with body color (no outline, grid space)
+			drawWholeCell(x,y);
+		}
+	}
+
+	function drawState() {
+		// erase last canvas/cells.
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		// set new cell size and shift value
+		if (!cfg.shiftLock) {
+			if (state.cellSize != 1) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
+			{
+				state.checkResetShiftValues();
+			}			
+			if (!checkReduceCellSize())
+				checkIncreaseCellSize()
+		}
+
+		// draw background grid
+		drawGrid();
+
+		// draw cells killed since last stepState (cells may repeat for multiple generations)
+		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell / or already drawn dead cell,
+		// for that reason they must be drawn first so they can be drawn over by live cells.
+		if (cfg.deadCellType > 0)
+			drawAllDeadCells();
+
+		for (let i = 0; i < state.x.length; i++) // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
+			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
+	}
+
 	function tickrateByInput() {
 		let newTickrate = Math.round(1000 / Math.pow(2, Number(tickrateInput.value)));
-		tickrateOutput.value = newTickrate + "ms"
 		cfg.tickRate = newTickrate;
 	}
 
@@ -740,22 +716,6 @@ console.time("its");
 			window.setTimeout(recursingRepeater, cfg.tickRate);
 		} else
 			button.innerText = "Run";
-	}
-
-	function shiftLockToggle() {
-		// let button = document.getElementById("shiftLockButton");
-		cfg.shiftLock = !cfg.shiftLock;
-		// button.innerText = (cfg.shiftLock)? "(X) Lock Perspective" : "( ) Lock Perspective";     
-	}
-
-	// function cellSizeLockToggle(){
-	//     let button = document.getElementById("cellSizeLockButton");
-	//     cfg.cellSizeLock = !cfg.cellSizeLock;
-	//     button.innerText = (cfg.cellSizeLock)? "(X) Lock Cell Size" : "( ) Lock Cell Size";
-	// }
-
-	function changeResidue() {
-		cfg.deadCellType = document.querySelector('input[name="residues"]:checked').value;
 	}
 
 	/// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
@@ -908,6 +868,55 @@ console.time("its");
 		state.minMaxes = newState.minMaxes;
 	}
 
+
+	//// Setup page elements and listeners
+	const canvas = document.getElementById("gameCanvas");
+	const gameBackgroundCanvas = document.getElementById('gameBackgroundCanvas');
+
+	function fitToContainer(canvas){
+		// Make it visually fill the positioned parent
+		canvas.style.width ='100%';
+		canvas.style.height='100%';
+		// ...then set the internal size to match
+		canvas.width  = canvas.offsetWidth;
+		canvas.height = canvas.offsetHeight;
+	}
+	fitToContainer(canvas);
+	fitToContainer(gameBackgroundCanvas);
+
+	let ctx = canvas.getContext("2d");
+	let ctx0 = gameBackgroundCanvas.getContext("2d");
+	canvas.addEventListener("mousemove", activateDrag);
+	canvas.addEventListener("mousedown", mouseDown);
+	canvas.addEventListener("mouseup", mouseUp);
+	canvas.addEventListener("wheel", zoom);
+
+	// globals that don't fit in anywhere else. Must be declared before starting gameflow.
+	let oldStates = [];
+	let running = false;
+
+	//// Put the defaults in the GUI.
+	// cell size, set during state initialization
+	// tick rate
+	cfg.tickRate = cfg.defaultTickRate;
+	// cell outlines enabled
+	document.getElementById("outlineCheckbox").checked = cfg.cellStyle.outlineEnabled;
+	// husk / cell outline width
+	outlineInput.value = cfg.cellStyle.outlineThick;
+	outlineOutput.value = cfg.cellStyle.outlineThick + "px";
+	// residue type
+	document.residueRadio.residues[cfg.deadCellType].checked = true;
+	// zoom checkbox
+	document.getElementById("autoZoom").checked = !cfg.sL;
+	// grid enabled, rest of setting will be processed in drawstate.
+	document.getElementById("gridCheckbox").checked = cfg.gridEnabled;
+
+
+	//// Game flow starts here...
+	let state = new State(true);
+	drawState();
+	//// ... User interaction all via listeners
+	//// Game flow ends here.
 } // Um, is that block really all I have to do to scope all my variables.?
 
 //console.timeEnd("its");

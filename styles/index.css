@@ -1,4 +1,4 @@
-ThisIsJustAColorPickerForUtility {    color: rgba(250, 79, 0, 0.568)    ;}
+ThisIsJustAColorPickerForUtility {    color: rgba(187, 255, 60, 0.911)    ;}
 
 body {
   background-color: #808080;
@@ -71,6 +71,6 @@ canvas {
   z-index: 1;
 }
 #gameBackgroundCanvas {
-  background-color: hsla(191, 100%, 89%, 0.438);
+  background-color: hsla(191, 100%, 89%, 0.3);
   z-index: 0;
 }

@@ -24,7 +24,7 @@
             <br>
             <button onclick="clearState()">Clear</button>
             <button onclick="saveState()">Save</button>
-            <button onclick="resetState()">Reset</button>
+            <button onclick="resetButton()">Reset</button>
         </div>
         <div id="toggles">
             <form autocomplete="off">
@@ -40,10 +40,12 @@
             </form>
         </div>
         <div id="settings">
+            <form name="residueRadio">
+                    <input id="noResids" type="radio" name="residues" onclick="changeResidueType()" value=0 checked><label for="noResids">No Residues</label><br>
+                    <input id="shadows" type="radio" name="residues" onclick="changeResidueType()" value=1><label for="shadows">Shadows</label><br>
+                    <input id="husks" type="radio" name="residues" onclick="changeResidueType()" value=2><label for="husks">Husks</label><br>
+            </form>
             <form autocomplete="off">
-                <input id="noResids" type="radio" name="residues" onclick="changeResidue()" value=0 checked><label for="noResids">No Residues</label><br>
-                <input id="shadows" type="radio" name="residues" onclick="changeResidue()" value=1><label for="shadows">Shadows</label><br>
-                <input id="husks" type="radio" name="residues" onclick="changeResidue()" value=2><label for="husks">Husks</label><br>
                 <input id="autoZoom" type="checkbox" value="unlocked" onclick="shiftLockToggle()" checked/><label for="autoZoom">Auto Zoom</label><br>
                 <input id="gridCheckbox" type="checkbox" value="unlocked" onclick="gridToggle()" checked/><label for="grid">Grid</label><br>
                 <input id="outlineCheckbox" type="checkbox" value="unlocked" onclick="outlineToggle()" checked/><label for="outline">Cell Outlines</label><br>
