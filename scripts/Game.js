@@ -607,18 +607,15 @@ function drawInnerCell(x, y) { // 1 pixel border on all sides -> does not yet ac
 
 function drawCellBorder(x, y) {
 	let size = state.cellSize;
-
 	let outLineW = cfg.cellStyle.outlineThick;
 	ctx.lineWidth = ((state.cellSize + 2) > (outLineW * 2)) ? outLineW : 1; // prevent outline from being larger than cell, or filling in cell.
 	ctx.beginPath();
 	if (cfg.gridEnabled) {
-		ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - 1 - outLineW, size - 1 - outLineW);
+		ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - outLineW - 1, size - outLineW - 1);
 	} else {
-		ctx.lineWidth = 1;
-		ctx.rect(x * size + 0.5, y * size + 0.5, size, size);
+		ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - outLineW + 1, size - outLineW + 1);
 	}
 	ctx.stroke();
-
 }
 
 function drawHusk(x, y, generation) {
