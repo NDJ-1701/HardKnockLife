@@ -56,11 +56,11 @@ let cfg = {
 	maximumCellSize: 64,
 	minimumCellSize: 1,
 	defaultTickRate: 250, // must be either: 4000, 2000, 1000, 500, 250, 125, 63, 31, 16, 8, 4, 2
-	get tickRate(){
+	get tickRate() {
 		return this.defaultTickRate;
 	},
-	set tickRate(value){
-		tickrateInput.value = Math.round(Math.log2( 1000 / value ));
+	set tickRate(value) {
+		tickrateInput.value = Math.round(Math.log2(1000 / value));
 		tickrateOutput.value = value + "ms";
 		this.defaultTickRate = value;
 	},
@@ -73,8 +73,8 @@ let cfg = {
 		outlineThick: 1 // 0 is not a valid input. Currently 1 to 5 is acceptable. Does not vary with cell size. used for husks and live cells.
 	},
 	gridEnabled: false,
-	get gridOffset(){
-		return (this.gridEnabled && state.cellSize > 3)? 1 : 0;
+	get gridOffset() {
+		return (this.gridEnabled && state.cellSize > 3) ? 1 : 0;
 	},
 	gridStyle: {
 		color: 'rgba(0, 0, 0, 0.568)'
@@ -101,13 +101,13 @@ let cfg = {
 
 //// Settings functions
 
-function gridToggle(){
-	cfg.gridEnabled =  document.getElementById("gridCheckbox").checked;
+function gridToggle() {
+	cfg.gridEnabled = document.getElementById("gridCheckbox").checked;
 	drawState();
 }
 
-function outlineToggle(){
-	cfg.cellStyle.outlineEnabled =  document.getElementById("outlineCheckbox").checked; // later this may be better as a slider.
+function outlineToggle() {
+	cfg.cellStyle.outlineEnabled = document.getElementById("outlineCheckbox").checked; // later this may be better as a slider.
 	drawState();
 }
 
@@ -284,7 +284,7 @@ const StateProtoType = {
 		this.yShift = this.savedYShift;
 		this.cellSize = this.savedCellSize;
 	},
-	clear: function(){
+	clear: function() {
 		this.matrix = [
 			[],
 			[]
@@ -408,10 +408,10 @@ function random() {
 }
 
 function checkReduceCellSize(decreased = false, zoom = false, targetSize = null) {
-	if (state.cellSize != 1){
+	if (state.cellSize != 1) {
 		if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
 			// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-			let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize - 1 : state.cellSize / 2;
+			let newCellSize = (zoom) ? (targetSize != null) ? targetSize : state.cellSize - 1 : state.cellSize / 2;
 			if (newCellSize < 2)
 				newCellSize = 1;
 			if (newCellSize >= cfg.minimumCellSize) {
@@ -429,7 +429,7 @@ function checkReduceCellSize(decreased = false, zoom = false, targetSize = null)
 function checkIncreaseCellSize(increased = false, zoom = false, targetSize = null) {
 	if (zoom || (!cfg.shiftLock && (state.cellsWide <= ((Math.floor((canvas.width / (state.cellSize)) / 2) - 10)) && state.cellsTall <= ((Math.floor((canvas.height / (state.cellSize)) / 2) - 10))))) {
 		// if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
-		let newCellSize = (zoom)? (targetSize != null)? targetSize : state.cellSize + 1 : state.cellSize * 2;
+		let newCellSize = (zoom) ? (targetSize != null) ? targetSize : state.cellSize + 1 : state.cellSize * 2;
 		if (newCellSize <= cfg.maximumCellSize) {
 			state.changeCellSizeTo(newCellSize);
 			if (targetSize != null)
@@ -532,26 +532,26 @@ function dragEnd(event) {
 // for drawing background grid
 let lastCellSize = null; // we need this to know when we need to redraw the background grid.
 let gridOnLastState = false; // check if we need to clear the grid, when toggling.
-function drawGrid(){
-	if (cfg.gridEnabled){
-		if (state.cellSize <= 3){  // don't draw a grid for tiny cells
-			if (lastCellSize != null){
+function drawGrid() {
+	if (cfg.gridEnabled) {
+		if (state.cellSize <= 3) { // don't draw a grid for tiny cells
+			if (lastCellSize != null) {
 				lastCellSize = null;
 				ctx0.clearRect(0, 0, canvas.width, canvas.height);
 			}
-		} else if (lastCellSize != state.cellSize || gridOnLastState === false){
+		} else if (lastCellSize != state.cellSize || gridOnLastState === false) {
 			ctx0.clearRect(0, 0, canvas.width, canvas.height);
 			lastCellSize = state.cellSize;
 			ctx0.beginPath();
 			ctx0.strokeStyle = cfg.gridStyle.color;
 			let canvasCellsWide = Math.floor(canvas.width / state.cellSize);
 			let canvasCellsTall = Math.floor(canvas.height / state.cellSize);
-			for (let i = 1; i <= canvasCellsWide; i++){
+			for (let i = 1; i <= canvasCellsWide; i++) {
 				let x = state.cellSize * i - 0.5;
 				ctx0.moveTo(x, 0);
 				ctx0.lineTo(x, canvas.height);
 			}
-			for (let i = 1; i <= canvasCellsTall; i++){
+			for (let i = 1; i <= canvasCellsTall; i++) {
 				let y = state.cellSize * i - 0.5;
 				ctx0.moveTo(0, y);
 				ctx0.lineTo(canvas.width, y);
@@ -565,34 +565,33 @@ function drawGrid(){
 	}
 }
 
-function drawWholeCell(x, y){
+function drawWholeCell(x, y) {
 	let size = state.cellSize;
 	ctx.fillRect(x * size, y * size, size - cfg.gridOffset, size - cfg.gridOffset); // when a grid is present, the right and lower side of each cell have a 1 pixel line.
 }
 
-function drawInnerCell(x, y){ // 1 pixel border on all sides -> does not yet account for border thickness; for now I'm not using, may use later if for some reason I don't want this to draw over borders
+function drawInnerCell(x, y) { // 1 pixel border on all sides -> does not yet account for border thickness; for now I'm not using, may use later if for some reason I don't want this to draw over borders
 	let size = state.cellSize;
 	ctx.fillRect(x * size + 1, y * size + 1, size - 1 - (cfg.gridOffset * 2), size - 1 - (cfg.gridOffset * 2));
 }
 
-function drawCellBorder(x, y){
+function drawCellBorder(x, y) {
 	let size = state.cellSize;
-	
+
 	let outLineW = cfg.cellStyle.outlineThick;
-	ctx.lineWidth = ((state.cellSize + 2) > (outLineW * 2))? outLineW : 1; // prevent outline from being larger than cell, or filling in cell.
-		ctx.beginPath();
-		if (cfg.gridEnabled){
-			ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - 1 - outLineW, size - 1 - outLineW);
-		}
-		else{
-			ctx.lineWidth = 1;
-			ctx.rect(x * size + 0.5, y * size + 0.5, size, size);
-		}
-		ctx.stroke();
-	
+	ctx.lineWidth = ((state.cellSize + 2) > (outLineW * 2)) ? outLineW : 1; // prevent outline from being larger than cell, or filling in cell.
+	ctx.beginPath();
+	if (cfg.gridEnabled) {
+		ctx.rect(x * size + outLineW / 2, y * size + outLineW / 2, size - 1 - outLineW, size - 1 - outLineW);
+	} else {
+		ctx.lineWidth = 1;
+		ctx.rect(x * size + 0.5, y * size + 0.5, size, size);
+	}
+	ctx.stroke();
+
 }
 
-function drawHusk(x, y, generation){
+function drawHusk(x, y, generation) {
 	//// various intesities of yellow
 	switch (generation) {
 		case 0:
@@ -637,11 +636,11 @@ function drawShadow(x, y, generation) { // this choice of color/style is not nec
 		ctx.fillStyle = opaColor;
 	} else
 		ctx.fillStyle = cfg.shadowColor;
-	drawWholeCell(x,y);
+	drawWholeCell(x, y);
 }
 
 
-function drawAllDeadCells(){
+function drawAllDeadCells() {
 	for (let m = 0; m < state.deadMatrices.length; m++) { // number of matrices = cfg.killedFadeOut (limited when matrix is added in stepState)
 		for (let i = 0; i < state.deadMatrices[m][0].length; i++) { // matrix[0] = deadXs, matrix[1] = deadYs
 			if (cfg.deadCellType == cfg.deadCellTypes.shadows)
@@ -656,11 +655,11 @@ function drawLiveCell(x, y) {
 	ctx.fillStyle = cfg.cellStyle.bodyColor;
 	if (state.cellSize > 4 && cfg.cellStyle.outlineEnabled) { // for large cells, use a bordered cell.
 		//drawInnerCell(x,y); // inner cell needs to be drawn first, because this does not account for border thickness.
-		drawWholeCell(x,y);
+		drawWholeCell(x, y);
 		ctx.strokeStyle = cfg.cellStyle.outlineColor;
-		drawCellBorder(x,y);
+		drawCellBorder(x, y);
 	} else { // for small cells, fill entire cell with body color (no outline, grid space)
-		drawWholeCell(x,y);
+		drawWholeCell(x, y);
 	}
 }
 
@@ -673,7 +672,7 @@ function drawState() {
 		if (state.cellSize != 1) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
 		{
 			state.checkResetShiftValues();
-		}			
+		}
 		if (!checkReduceCellSize())
 			checkIncreaseCellSize();
 	}
@@ -697,10 +696,10 @@ function tickrateByInput() {
 }
 
 function recursingRepeater() {
-if (running) {
-	drawState(stepState(1));
-	window.setTimeout(recursingRepeater, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
-}
+	if (running) {
+		drawState(stepState(1));
+		window.setTimeout(recursingRepeater, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
+	}
 }
 
 /// infinitely run the interval stepper until user clicks stop
@@ -871,12 +870,12 @@ function stepState(steps = 1) {
 const canvas = document.getElementById("gameCanvas");
 const gameBackgroundCanvas = document.getElementById('gameBackgroundCanvas');
 
-function fitToContainer(canvas){
+function fitToContainer(canvas) {
 	// Make it visually fill the positioned parent
-	canvas.style.width ='100%';
-	canvas.style.height='100%';
+	canvas.style.width = '100%';
+	canvas.style.height = '100%';
 	// ...then set the internal size to match
-	canvas.width  = canvas.offsetWidth;
+	canvas.width = canvas.offsetWidth;
 	canvas.height = canvas.offsetHeight;
 }
 fitToContainer(canvas);
