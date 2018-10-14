@@ -133,9 +133,13 @@ function changeResidueType() {
 }
 
 //// A few initial states to show on load:
+// let aCoupleDots = [
+// 	[10, 10, 11, 11],
+// 	[10, 11, 10, 11]
+// ];
 let aCoupleDots = [
-	[10, 10, 11, 11],
-	[10, 11, 10, 11]
+	[0, 1, 1],
+	[1, 0, 1]
 ];
 let gosperGliderGun = [
 	[14, 14, 15, 15, 24, 24, 24, 25, 26, 27, 25, 26, 27, 29, 30, 30, 30, 31, 29, 28, 34, 34, 34, 35, 35, 35, 36, 36, 38, 38, 38, 38, 48, 49, 49, 48],
@@ -159,7 +163,7 @@ let variousInitialState = [
 //// our main state object and prototype
 
 let initialSetupComments = variousInitialStateComments;
-let initialSetup = variousInitialState;
+let initialSetup = aCoupleDots;
 
 const StateProtoType = {
 	privateCellSize: cfg.initialCellSize,
@@ -350,16 +354,15 @@ function arrayMin(arr) {
 	return max;
   };
 
-/// Search for matches in parallel arrays
+/// Return index of first specified pair of values in parallel arrays
 // needed for finding isAlive and isTouched because native .includes matches by reference, not values
-function paraInd(x, y, arrXs, arrYs) {
-	let indexes = [];
-	for (let i = 0; i < arrXs.length; i++)
-		if (arrXs[i] === x)
-			indexes.push(i);
-	for (let index of indexes)
-		if (arrYs[index] === y)
-			return index;
+function paraInd(x, y, xArray, yArray) {
+	for (let i = 0; i < xArray.length; i++){
+		if (xArray[i] === x){
+			if (yArray[i] === y)
+				return i;
+		}
+	}
 	return -1;
 }
 
@@ -829,8 +832,7 @@ function stepBack() {
 	}
 }
 
-/// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
-function stepState(steps = 1) {
+function scottsStepper(){
 	console.time("step");
 	if (cfg.enableUndo) {
 		if (oldStates.length > cfg.maxUndo) {
@@ -844,22 +846,15 @@ function stepState(steps = 1) {
 	}
 
 	let touched = [
-		[],
-		[],
-		[],
-		[]
-	]; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
+		[], // [x]
+		[], // [y]
+		[], // [n] , n = times touched
+		[]  // [a] , a = alive (bool)
+	];
 	let killedMatrix = [
 		[],
 		[]
 	];
-	const newState = new State();
-	let bounds = {
-		xmin: state.xMin,
-		xmax: state.xMax,
-		ymin: state.yMin,
-		ymax: state.yMax
-	};
 	// determine which cells are neighbors to the specified cell, and increment their 'touched' counter
 	function touch(xo, yo) {
 		for (let y = yo - 1; y <= yo + 1; y++) {
@@ -888,6 +883,8 @@ function stepState(steps = 1) {
 	for (let i = 0; i < state.x.length; i++) {
 		touch(state.x[i], state.y[i]); // increment counter for each adjacent living cell
 	}
+
+	const newState = new State();
 	for (let i = 0; i < touched[0].length; i++) { // check the counter to see how many adjacent cells are living
 		let x = touched[0][i];
 		let y = touched[1][i];
@@ -904,14 +901,7 @@ function stepState(steps = 1) {
 
 		}
 	}
-	if (steps > 1) {
-		return stepState(--steps); // repeat
-	}
-
-	// setting these props individually isn't really taking advantage of the multiple state objects
-	// we should probably be setting the properties of newstate in here and then replacing the entire state object
-
-	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
+	
 	if (cfg.deadCellType) {
 		state.deadMatrices.unshift(killedMatrix);
 		if (state.deadMatrices.length > cfg.killedFadeOut)
@@ -919,6 +909,104 @@ function stepState(steps = 1) {
 	}
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
+
+	if (steps > 1) {
+		return stepState(--steps); // repeat
+	}
+
+	console.timeEnd("step");
+}
+
+/// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
+function stepState(steps = 1) {
+	console.time("step");
+	if (cfg.enableUndo) {
+		if (oldStates.length > cfg.maxUndo) {
+			oldStates.shift();
+		}
+		let oldState = new State();
+		oldState.init(state.matrix, state.comments);
+		oldState.xShift = state.xShift;
+		oldState.yShift = state.yShift;
+		oldStates.push(oldState);
+	}
+
+	let results = []; // [[x,y,c,a]]
+	// fill results matrix with current state cells, adding alive attribute
+	for (let i = 0, len = state.x.length; i < len; i ++ ){
+		results.push([state.x[i], state.y[i], 0, 1])
+	}
+	// fill results matrix with non-alive "touch" pairs
+	for (let i = 0, len = state.x.length; i < len; i ++ ){		
+		// 4 sides
+		results.push([state.x[i] - 1, state.y[i], 0, 0])
+		results.push([state.x[i] + 1, state.y[i], 0, 0])
+		results.push([state.x[i], state.y[i] - 1, 0, 0])
+		results.push([state.x[i], state.y[i] + 1, 0, 0])
+		// 4 corners
+		results.push([state.x[i] - 1, state.y[i] + 1, 0, 0])
+		results.push([state.x[i] - 1, state.y[i] - 1, 0, 0])
+		results.push([state.x[i] + 1, state.y[i] + 1, 0, 0])
+		results.push([state.x[i] + 1, state.y[i] - 1, 0, 0])
+	}
+	// for each pair in results, combine matching pairs, remove matches as they are found so they are counted only once.
+	function packArray1(startingIndex) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
+		let srcIndex = startingIndex + 1;
+		let dstIndex = startingIndex + 1;
+		let xMatch = results[startingIndex][0];
+		let yMatch = results[startingIndex][1];
+		var arrayLength = results.length ;
+		//console.log('length', arrayLength);
+		do {
+			var elem = results[srcIndex];
+			if (elem[0] === xMatch && elem[1] === yMatch) {
+				//console.log('match!');
+				results[startingIndex][2]++; // add a count for a match
+			} else{
+				if (srcIndex != dstIndex)
+					results[dstIndex] = elem ;
+				dstIndex++; // shift array so this item isn't counted again.
+			}
+			srcIndex++;
+		} while (srcIndex != arrayLength);
+		 //dstIndex--;
+		 //console.log('newlength',dstIndex);
+		 results.length = dstIndex > 0 ? dstIndex : 0 ;
+	 }
+	//console.log('initialarray', state.matrix);
+	//console.log('Initial results',...results);
+	for (let i = 0; i < (results.length - 1); i ++ ){ // results.length must be re-evaluated every time because it changes in the function called.
+		results[i][2] = 1; // initialize count by including self.
+		//console.log('checking', results[i]);
+		packArray1(i); // count other touches.
+		//console.log('results',...results);
+	}
+	// build new state matrix: all results with c = 3, or c = 4 && alive are saved, else if alive saved in killed matrix.
+	let newState = new State();
+	let killedMatrix = [[],[]];
+	for (let i = 0, len = results.length; i < len; i++){
+		elem = results[i];
+		if (elem[2] === 3 || (elem[2] === 4 && elem[3] === 1)){
+			newState.push(elem[0], elem[1]);
+		} else if (elem[3] === 1){
+			//console.log('pushing', elem[0], elem[1]);
+			killedMatrix[0].push(elem[0]);
+			killedMatrix[1].push(elem[1]);
+		}
+	}
+	//console.log('killedmatrix',killedMatrix[0],killedMatrix[1]);
+	if (cfg.deadCellType) {
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
+	//console.log('new matrix', newState.matrix);
+	state.matrix = newState.matrix;
+	state.minMaxes = newState.minMaxes;
+
+	if (steps > 1) {
+		return stepState(--steps); // repeat
+	}
 
 	console.timeEnd("step");
 }
