@@ -11,8 +11,13 @@ questions / comments:
 	I'd like an explanation why we are using JSON for saving the state.
 
 enhancements:
+	asychronicity of stepstate and drawstate in the run function should be researched and improved. Drawing should happen at the tickrate or framerate: it seems like it's waiting for a new stepstate to complete
+	and I don't know why.
+
 	start game flow at bottom and move "global" variables next to relevant functions, if they are only used in one place. Currently global variables have to be at the top because
 	drawstate etc is called near the top, before they would otherwise have been defined.
+
+	a badass way of 3 dimensionalizing this would be to have the last states fall away into the background, almost like the live grid was flying toward you.
 
 	grid should be darker/lighter every 5 lines
 
@@ -175,10 +180,10 @@ const StateProtoType = {
 		return Math.floor(canvas.height / this.cellSize);
 	},
 	refreshMinMaxes: function() {
-		this.xMin = Math.min(...this.x);
-		this.xMax = Math.max(...this.x);
-		this.yMin = Math.min(...this.y);
-		this.yMax = Math.max(...this.y);
+		this.xMin = arrayMin(this.x); //Math.min(...this.x);
+		this.xMax = arrayMax(this.x); //Math.max(...this.x);
+		this.yMin = arrayMin(this.y); //Math.min(...this.y);
+		this.yMax = arrayMax(this.y); //Math.max(...this.y);
 	},
 	printComments: function() {
 		document.getElementById('comments').innerHTML = this.comments;
@@ -243,16 +248,16 @@ const StateProtoType = {
 	remove: function(index) { // removes an xy pair at index, and sets mins and maxes if necessary.
 		if (this.x[index] === this.xMin) {
 			this.privateSpliceAtIndex(index);
-			this.xMin = Math.min(...this.x);
+			this.xMin = arrayMin(this.x);// Math.min(...this.x);
 		} else if (this.x[index] === this.xMax) {
 			this.privateSpliceAtIndex(index);
-			this.xMax = Math.max(...this.x);
+			this.xMax = arrayMax(this.x);  // Math.max(...this.x);
 		} else if (this.y[index] === this.yMin) {
 			this.privateSpliceAtIndex(index);
-			this.yMin = Math.min(...this.y);
+			this.yMin = arrayMin(this.y); // Math.min(...this.y);
 		} else if (this.y[index] === this.yMax) {
 			this.privateSpliceAtIndex(index);
-			this.yMax = Math.max(...this.y);
+			this.yMax = arrayMax(this.y); // Math.max(...this.y);
 		} else {
 			this.privateSpliceAtIndex(index);
 		}
@@ -325,6 +330,26 @@ function getRandomInt(max) {
 	return Math.floor(Math.random() * Math.floor(max));
 }
 
+function arrayMin(arr) {
+	var len = arr.length, min = Infinity;
+	while (len--) {
+	  if (arr[len] < min) {
+		min = arr[len];
+	  }
+	}
+	return min;
+  };
+  
+  function arrayMax(arr) {
+	var len = arr.length, max = -Infinity;
+	while (len--) {
+	  if (arr[len] > max) {
+		max = arr[len];
+	  }
+	}
+	return max;
+  };
+
 /// Search for matches in parallel arrays
 // needed for finding isAlive and isTouched because native .includes matches by reference, not values
 function paraInd(x, y, arrXs, arrYs) {
@@ -362,6 +387,11 @@ function addCellAtCursorPosition(event) {
 
 function resetButton() {
 	state.reset();
+	drawState();
+}
+
+function clearButton() {
+	state.clear();
 	drawState();
 }
 
@@ -664,30 +694,33 @@ function drawLiveCell(x, y) {
 }
 
 function drawState() {
-	// erase last canvas/cells.
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	// draw on a paused canvas; we don't want to refresh the screen for every line or pixel.
+	window.requestAnimationFrame(() => {
+		// erase last canvas/cells.
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	// set new cell size and shift value
-	if (!cfg.shiftLock) {
-		if (state.cellSize != 1) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
-		{
-			state.checkResetShiftValues();
+		// set new cell size and shift value
+		if (!cfg.shiftLock) {
+			if (state.cellSize != 1) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
+			{
+				state.checkResetShiftValues();
+			}
+			if (!checkReduceCellSize())
+				checkIncreaseCellSize();
 		}
-		if (!checkReduceCellSize())
-			checkIncreaseCellSize();
-	}
 
-	// draw background grid
-	drawGrid();
+		// draw background grid
+		drawGrid();
 
-	// draw cells killed since last stepState (cells may repeat for multiple generations)
-	// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell / or already drawn dead cell,
-	// for that reason they must be drawn first so they can be drawn over by live cells.
-	if (cfg.deadCellType > 0)
-		drawAllDeadCells();
+		// draw cells killed since last stepState (cells may repeat for multiple generations)
+		// because dead cells last for multiple generations, they may be drawn in the same cell as a live cell / or already drawn dead cell,
+		// for that reason they must be drawn first so they can be drawn over by live cells.
+		if (cfg.deadCellType > 0)
+			drawAllDeadCells();
 
-	for (let i = 0; i < state.x.length; i++) // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
-		drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
+		for (let i = 0; i < state.x.length; i++) // no matter the coordinates, always draw starting at 0,0 in the ++ quadrant. Values are shifted into the ++ quadrant using the xShift, yShift            
+			drawLiveCell(state.x[i] + state.xShift, state.y[i] + state.yShift);
+	});
 }
 
 function tickrateByInput() {
@@ -695,10 +728,28 @@ function tickrateByInput() {
 	cfg.tickRate = newTickrate;
 }
 
-function recursingRepeater() {
+function stepRecursively() {
 	if (running) {
-		drawState(stepState(1));
-		window.setTimeout(recursingRepeater, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
+		console.timeEnd("newstep");
+		stepState();
+		window.setTimeout(stepRecursively, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
+		console.time("newstep");
+	}
+}
+
+function refreshTime() {
+	if (cfg.tickRate < 16.66)
+		return 16.66; // 60 frames per second
+	else
+		return cfg.tickRate;
+}
+
+function drawRecursively() {
+	if (running) {
+		console.timeEnd("draw");
+		drawState();
+		window.setTimeout(drawRecursively, refreshTime()); // this line allows the tickrate to be re-evaluated.
+		console.time("draw");
 	}
 }
 
@@ -710,9 +761,17 @@ function run() {
 	if (running) // start stepping interval
 	{
 		button.innerText = "Stop";
-		window.setTimeout(recursingRepeater, cfg.tickRate);
+		console.time("newstep");
+		stepRecursively();
+		console.time("draw");
+		drawRecursively();
 	} else
 		button.innerText = "Run";
+}
+
+function stepOnce() {
+	stepState();
+	drawState();
 }
 
 /// given the text contents of an RLE file: output State containing comment, Xs[] and Ys[]
@@ -775,7 +834,7 @@ function stepBack() {
 
 /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
 function stepState(steps = 1) {
-
+	console.time("step");
 	if (cfg.enableUndo) {
 		if (oldStates.length > cfg.maxUndo) {
 			oldStates.shift();
@@ -822,9 +881,9 @@ function stepState(steps = 1) {
 					}
 				} else
 				if (x !== xo || y !== yo)
-					touched[2][index] += 1; // iff it's a neighbor, increment the counter
+					touched[2][index] += 1; // if it's a neighbor, increment the counter
 				else
-					touched[3][index] = true; // iff it's the cell itself, make sure it's marked alive
+					touched[3][index] = true; // if it's the cell itself, make sure it's marked alive
 			}
 		}
 	}
@@ -863,6 +922,8 @@ function stepState(steps = 1) {
 	}
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
+
+	console.timeEnd("step");
 }
 
 
