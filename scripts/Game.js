@@ -156,8 +156,8 @@ let variousInitialStateComments = `#N Various Initial States <br>
 #O NaOH <br>
 #C Includes gosper glider gun, figure 8 oscillator, and pulsar.`;
 let variousInitialState = [
-	[14, 14, 15, 15, 24, 24, 26, 28, 28, 24, 24, 28, 28, 24, 26, 29, 35, 37, 37, 36, 36, 39, 40, 37, 40, 36, 36, 36, 37, 40, 39, 40, 44, 44, 48, 46, 47, 48, 45, 43, 45, 49, 49, 16, 15, 17, 18, 18, 18, 15, 16, 17, 13, 13, 13, 21, 23, 22, 20, 20, 20, 21, 22, 23, 25, 25, 25, 15, 17, 16, 18, 18, 18, 13, 13, 13, 15, 16, 17, 22, 20, 21, 23, 20, 20, 25, 25, 25, 21, 22, 23, 69, 70, 68, 71, 72, 67, 66, 73, 74, 66, 74, 67, 73, 68, 72, 69, 70, 71, 63, 62, 63, 62, 64, 64, 62, 63, 64, 65, 66, 67, 65, 65, 67, 66, 67, 66],
-	[21, 22, 22, 21, 20, 19, 19, 20, 21, 22, 24, 23, 24, 25, 25, 22, 25, 25, 26, 27, 26, 17, 18, 18, 17, 19, 20, 21, 22, 22, 23, 23, 19, 21, 18, 21, 21, 21, 19, 20, 21, 19, 20, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 43, 42, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 42, 43, 46, 46, 46, 48, 47, 49, 47, 49, 48, 51, 51, 51, 46, 47, 46, 46, 49, 48, 47, 48, 49, 51, 51, 51, 34, 34, 35, 34, 35, 36, 38, 36, 38, 39, 39, 41, 41, 42, 42, 43, 43, 43, 7, 8, 8, 7, 7, 8, 9, 9, 9, 10, 10, 10, 11, 12, 11, 12, 12, 11]
+	[13,  13,  13,  13,  13,  13,  14,  14,  15,  15,  15,  15,  15,  15,  16,  16,  16,  16,  17,  17,  17,  17,  18,  18,  18,  18,  18,  18,  20,  20,  20,  20,  20,  20,  21,  21,  21,  21,  22,  22,  22,  22,  23,  23,  23,  23,  24,  24,  24,  24,  24,  25,  25,  25,  25,  25,  25,  26,  26,  28,  28,  28,  28,  29,  35,  36,  36,  36,  36,  36,  37,  37,  37,  37,  39,  39,  40,  40,  40,  40,  43,  44,  44,  45,  45,  46,  47,  48,  48,  49,  49,  62,  62,  62,  63,  63,  63,  64,  64,  64,  65,  65,  65,  66,  66,  66,  66,  66,  67,  67,  67,  67,  67,  68,  68,  69,  69,  70,  70,  71,  71,  72,  72,  73,  73,  74,  74],
+	[41, 42, 43, 47, 48, 49, 21, 22, 21, 22, 39, 44, 46, 51, 39, 44, 46, 51, 39, 44, 46, 51, 41, 42, 43, 47, 48, 49, 41, 42, 43, 47, 48, 49, 39, 44, 46, 51, 39, 44, 46, 51, 39, 44, 46, 51, 19, 20, 22, 24, 25, 41, 42, 43, 47, 48, 49, 19, 25, 20, 21, 23, 24, 22, 25, 19, 20, 21, 26, 27, 18, 22, 25, 26, 17, 23, 17, 18, 22, 23, 20, 19, 21, 19, 21, 21, 21, 18, 21, 19, 20, 7, 8, 9, 7, 8, 9, 7, 8, 9, 10, 11, 12, 10, 11, 12, 38, 39, 10, 11, 12, 36, 41, 35, 42, 34, 43, 34, 43, 34, 43, 35, 42, 36, 41, 38, 39 ]
 ];
 
 //// our main state object and prototype
@@ -731,10 +731,10 @@ function tickrateByInput() {
 
 function stepRecursively() {
 	if (running) {
-		console.timeEnd("newstep");
+		//console.timeEnd("newstep");
 		stepState();
 		window.setTimeout(stepRecursively, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
-		console.time("newstep");
+		//console.time("newstep");
 	}
 }
 
@@ -747,10 +747,10 @@ function refreshTime() {
 
 function drawRecursively() {
 	if (running) {
-		console.timeEnd("draw");
+		//console.timeEnd("draw");
 		drawState();
 		window.setTimeout(drawRecursively, refreshTime()); // this line allows the tickrate to be re-evaluated.
-		console.time("draw");
+		//console.time("draw");
 	}
 }
 
@@ -762,9 +762,9 @@ function run() {
 	if (running) // start stepping interval
 	{
 		button.innerText = "Stop";
-		console.time("newstep");
+		//console.time("newstep");
 		stepRecursively();
-		console.time("draw");
+		//console.time("draw");
 		drawRecursively();
 	} else
 		button.innerText = "Run";
@@ -998,76 +998,82 @@ function noahStepper2(){
 	// fill results matrix with current state cells, adding alive attribute
 	results[0] = state.x.slice();
 	results[1] = state.y.slice()
-	let xLen = state.x.length;
+	const xLen = state.x.length;
 	var aliveFlags = new Array(xLen);
 	let countDown = xLen;
 	for (; countDown;)
 		aliveFlags[--countDown] = 1;
 	results[3] = aliveFlags;
 
-	// fill results matrix surrounding "touched" pairs
-	let xres = results[0]; // x array reference
-	let yres = results[1]; // y array reference
+	// fill results matrix with surrounding "touched" pairs
+	let xref = results[0]; // x array reference
+	let yref = results[1]; // y array reference
 	for (let i = 0; i < xLen; i ++ ){
-		let x = xres[i]; let y = yres[i];
-		xres.push(x); yres.push(y - 1); // top middle
-		xres.push(x); yres.push(y + 1); // bottom middle
+		let x = xref[i]; let y = yref[i];
+		xref.push(x); yref.push(y - 1); // top middle
+		xref.push(x); yref.push(y + 1); // bottom middle
 		for (let p = -1; p <= 1; p++){
-			xres.push(x - 1); yres.push(y + p); // left side
-			xres.push(x + 1); yres.push(y + p); // right side
+			xref.push(x - 1); yref.push(y + p); // left side
+			xref.push(x + 1); yref.push(y + p); // right side
 		}		
 	}
 	
-	let firstTime = true;
+	//let firstTime = true;
 
 	// for each pair in results, combine matching pairs, remove matches as they are found so they are counted only once.
 	function packArray1(startingIndex, length) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
-		let srcIndex = startingIndex + 1; // skip all previously scanned
-		let dstIndex = startingIndex + 1;
-		let xMatch = xres[startingIndex];
-		let yMatch = yres[startingIndex];
+		let srcIndex = (startingIndex < xLen)? xLen : startingIndex + 1; // skip all previously scanned
+		//let dstIndex = startingIndex + 1;
+		let dstIndex = srcIndex;
+		let xMatch = xref[startingIndex];
+		let yMatch = yref[startingIndex];
 		//if (firstTime) console.log('length', length);
 		do {
 			//if (firstTime) console.log('source index', srcIndex);
-			let xTest = xres[srcIndex];
-			let yTest = yres[srcIndex];
+			let xTest = xref[srcIndex];
+			//let yTest = yres[srcIndex]; // this variable doesn't always need to exist
 			noahIterateCount++;
-			if (xTest === xMatch && yTest === yMatch) {
+
+			if (xTest === xMatch && yref[srcIndex] === yMatch) {
 				results[2][startingIndex]++; // add a count for a match
 			} else{
 				if (srcIndex != dstIndex){
-					xres[dstIndex] = xTest;
-					yres[dstIndex] = yTest;
+					xref[dstIndex] = xTest;
+					yref[dstIndex] = yref[srcIndex];
 				}
 				dstIndex++; // shift array so this item isn't counted again.
 			}
 			srcIndex++;
-		} while (srcIndex != length); //(length - startingIndex - xLen - 1));
-		//console.log('this time iterations', noahIterateCount);
+		} while (srcIndex != length);
+		//console.log('this time iterations', noahIterateCount - iterationPerIndex);
+		// iterationPerIndex = noahIterateCount;
 		//noahIterateCount = 0;
 			//dstIndex--;
-		xres.length = dstIndex > 0 ? dstIndex : 0 ; // remove ending array elements, now duplicates due to the shift.
+		xref.length = dstIndex > 0 ? dstIndex : 0 ; // remove ending array elements, now duplicates due to the shift.
 		//yres.length = xres.length; // pretty sure this doesn't make any difference. Yep, unnecessary.
-		firstTime = false;
+		// firstTime = false;
 	}
+	let iterationPerIndex = 0;
 	let noahIterateCount = 0;
-	let reducedLength = xres.length;
+	let reducedLength = xref.length;
+	//console.log('startingLength', reducedLength);
 	// an enhancement would be to break the checking loop if we are too far from the current location, which would require an ordered array (it is already partially ordered, so perhaps this isn't a big prob)
 	// for instance, if we are 2x and 2y away from the square we are checking, perhaps we don't need to check further for touches.
-	console.log('length', reducedLength);
+	// maybe during "touch" incrementer, if it is 5, throw it away immediately?
+	// * sort entire matrix (pre-touch) into arrays at a X location (representing layers). only check against above and below layer. These layers could be sorted for ignorring Y of too great.
+	// * these layers could also be used to divide the grid into smaller sections to ignore distant sections.
+	//console.log('length', reducedLength);
+	//console.log('xlen', xLen);
 	for (let i = 0; i < (reducedLength - 1); i ++ ){ // results.length must be re-evaluated every time because it changes in the function called.
 		//console.log('reduced l', reducedLength);
 		results[2][i] = 1; // initialize count by including self.
-		// if (i < xLen)
-		// 	packArray1(xLen, reducedLength); // don't bother checking against alive cells, they are unique
-		// else	
-			packArray1(i, reducedLength); // count other touches.
-		reducedLength = xres.length; // update new length
+		packArray1(i, reducedLength); // count other touches.
+		reducedLength = xref.length; // update new length
 		//console.log('packed');
 	}
-	console.log('noahs iterate count (mils)', noahIterateCount / 1000000);
-
 	console.timeEnd("noahEnhancedStep");
+	//console.log('noahs iterate count (10^5)', noahIterateCount / 100000);
+	//console.log('endingLength', reducedLength);	
 
 	// build new state matrix: all results with c = 3, or c = 4 && alive are saved, else if alive saved in killed matrix.
 	// let newState = new State();
@@ -1076,11 +1082,11 @@ function noahStepper2(){
 	// 	let count = results[2][i];
 	// 	let wasAlive = results[3][i];
 	// 	if (count === 3 || (count === 4 && wasAlive)){
-	// 		newState.push(xres[i], yres[i]);
+	// 		newState.push(xref[i], yref[i]);
 	// 	} else if (wasAlive){
 	// 		//console.log('pushing', elem[0], elem[1]);
-	// 		killedMatrix[0].push(xres[i]);
-	// 		killedMatrix[1].push(yres[i]);
+	// 		killedMatrix[0].push(xref[i]);
+	// 		killedMatrix[1].push(yref[i]);
 	// 	}
 	// }
 	// //console.log('killedmatrix',killedMatrix[0],killedMatrix[1]);
@@ -1099,16 +1105,16 @@ let scottIterateCount = 0;
 /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
 function stepState(steps = 1) {
 	
-	if (cfg.enableUndo) {
-		if (oldStates.length > cfg.maxUndo) {
-			oldStates.shift();
-		}
-		let oldState = new State();
-		oldState.init(state.matrix, state.comments);
-		oldState.xShift = state.xShift;
-		oldState.yShift = state.yShift;
-		oldStates.push(oldState);
-	}
+	// if (cfg.enableUndo) {
+	// 	if (oldStates.length > cfg.maxUndo) {
+	// 		oldStates.shift();
+	// 	}
+	// 	let oldState = new State();
+	// 	oldState.init(state.matrix, state.comments);
+	// 	oldState.xShift = state.xShift;
+	// 	oldState.yShift = state.yShift;
+	// 	oldStates.push(oldState);
+	// }
 
 
 	// console.time("noahMultiObjectstep");
@@ -1118,11 +1124,18 @@ function stepState(steps = 1) {
 	console.time("scottStep");
 	scottIterateCount = 0;
 	scottsStepper();
-	console.log('scotts iteration count(mils)',scottIterateCount / 1000000)
 	console.timeEnd("scottStep");
+	//console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
 	console.time("noahEnhancedStep");
 	noahStepper2();
-	//console.timeEnd("noahEnhancedStep");
+
+	console.time("scottStep");
+	scottIterateCount = 0;
+	scottsStepper();
+	console.timeEnd("scottStep");
+	//console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
+	console.time("noahEnhancedStep");
+	noahStepper2();
 
 	if (steps > 1) {
 		return stepState(--steps); // repeat
