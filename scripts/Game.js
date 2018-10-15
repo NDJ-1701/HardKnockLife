@@ -994,16 +994,16 @@ function noahStepper1(){
 }
 
 function noahStepper2(){
-	let results = [[],[],[],[]]; // [[x],[y],[c],[a]]
+	console.time("noahEnhancedStartStep");
+
+	let results = [[],[],[]]; // [[x],[y],[c]]
+	//let newState = new State();
+	let newState = [[],[]];
+	let killedMatrix = [[],[]];
 	// fill results matrix with current state cells, adding alive attribute
 	results[0] = state.x.slice();
 	results[1] = state.y.slice()
 	const xLen = state.x.length;
-	var aliveFlags = new Array(xLen);
-	let countDown = xLen;
-	for (; countDown;)
-		aliveFlags[--countDown] = 1;
-	results[3] = aliveFlags;
 
 	// fill results matrix with surrounding "touched" pairs
 	let xref = results[0]; // x array reference
@@ -1017,21 +1017,41 @@ function noahStepper2(){
 			xref.push(x + 1); yref.push(y + p); // right side
 		}		
 	}
+
+	function checkWasAliveCell(i){
+		let count = results[2][i];
+		if (count === 3 || (count === 4)){
+			//newState.push(xref[i], yref[i]);
+			newState[0].push(xref[i]);
+			newState[1].push(yref[i]);
+		} else {
+			killedMatrix[0].push(xref[i]);
+			killedMatrix[1].push(yref[i]);
+		}
+	}
+
+	function checkWasDeadCell(i){
+		let count = results[2][i];
+		if (count === 3){
+			//newState.push(xref[i], yref[i]);
+			newState[0].push(xref[i]);
+			newState[1].push(yref[i]);
+		}
+	}
 	
-	//let firstTime = true;
 
 	// for each pair in results, combine matching pairs, remove matches as they are found so they are counted only once.
 	function packArray1(startingIndex, length) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
-		let srcIndex = (startingIndex < xLen)? xLen : startingIndex + 1; // skip all previously scanned
-		//let dstIndex = startingIndex + 1;
+		let srcIndex = xLen; // skip all alive cells, this function is only for alive cells.
 		let dstIndex = srcIndex;
 		let xMatch = xref[startingIndex];
 		let yMatch = yref[startingIndex];
-		//if (firstTime) console.log('length', length);
+
+		// console.timeEnd("noahEnhancedStep");
+		// console.time("noahEnhancedStep");
+		
 		do {
-			//if (firstTime) console.log('source index', srcIndex);
 			let xTest = xref[srcIndex];
-			//let yTest = yres[srcIndex]; // this variable doesn't always need to exist
 			noahIterateCount++;
 
 			if (xTest === xMatch && yref[srcIndex] === yMatch) {
@@ -1045,59 +1065,83 @@ function noahStepper2(){
 			}
 			srcIndex++;
 		} while (srcIndex != length);
-		//console.log('this time iterations', noahIterateCount - iterationPerIndex);
-		// iterationPerIndex = noahIterateCount;
-		//noahIterateCount = 0;
-			//dstIndex--;
 		xref.length = dstIndex > 0 ? dstIndex : 0 ; // remove ending array elements, now duplicates due to the shift.
-		//yres.length = xres.length; // pretty sure this doesn't make any difference. Yep, unnecessary.
-		// firstTime = false;
+		checkWasAliveCell(startingIndex);
 	}
+	function packArray2(startingIndex, length) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
+		let srcIndex = startingIndex + 1; // skip all previously scanned
+		let dstIndex = srcIndex;
+		let xMatch = xref[startingIndex];
+		let yMatch = yref[startingIndex];
+
+		// console.timeEnd("noahEnhancedStep");
+		// console.time("noahEnhancedStep");
+
+		do {
+			let xTest = xref[srcIndex];
+			noahIterateCount++;
+
+			if (xTest === xMatch && yref[srcIndex] === yMatch) {
+				results[2][startingIndex]++; // add a count for a match
+			} else{
+				if (srcIndex != dstIndex){
+					xref[dstIndex] = xTest;
+					yref[dstIndex] = yref[srcIndex];
+				}
+				dstIndex++; // shift array so this item isn't counted again.
+			}
+			srcIndex++;
+		} while (srcIndex != length);
+		xref.length = dstIndex > 0 ? dstIndex : 0 ; // remove ending array elements, now duplicates due to the shift.
+		checkWasDeadCell(startingIndex);
+	}
+
 	let iterationPerIndex = 0;
 	let noahIterateCount = 0;
 	let reducedLength = xref.length;
-	//console.log('startingLength', reducedLength);
+
 	// an enhancement would be to break the checking loop if we are too far from the current location, which would require an ordered array (it is already partially ordered, so perhaps this isn't a big prob)
 	// for instance, if we are 2x and 2y away from the square we are checking, perhaps we don't need to check further for touches.
 	// maybe during "touch" incrementer, if it is 5, throw it away immediately?
 	// * sort entire matrix (pre-touch) into arrays at a X location (representing layers). only check against above and below layer. These layers could be sorted for ignorring Y of too great.
 	// * these layers could also be used to divide the grid into smaller sections to ignore distant sections.
-	//console.log('length', reducedLength);
-	//console.log('xlen', xLen);
-	for (let i = 0; i < (reducedLength - 1); i ++ ){ // results.length must be re-evaluated every time because it changes in the function called.
-		//console.log('reduced l', reducedLength);
+
+	
+	// console.time("noahEnhancedAliveStep");
+	// console.time("noahEnhancedStep");
+
+	for (let i = 0; i < xLen; i ++ ){ // this loop is only for checking alive cells.
 		results[2][i] = 1; // initialize count by including self.
 		packArray1(i, reducedLength); // count other touches.
 		reducedLength = xref.length; // update new length
-		//console.log('packed');
 	}
-	console.timeEnd("noahEnhancedStep");
-	//console.log('noahs iterate count (10^5)', noahIterateCount / 100000);
+
+	// console.timeEnd("noahEnhancedAliveStep");
+	// console.time("noahEnhancedDeadStep");
+	// console.time("noahEnhancedStep");
+
+	for (let i = xLen; i < (reducedLength - 1); i ++ ){ // results.length must be re-evaluated every time, as it is on this line, because it changes in the function called.
+		results[2][i] = 1; // initialize count by including self.
+		packArray2(i, reducedLength); // count other touches.
+		reducedLength = xref.length; // update new length
+	}
+
+	//console.timeEnd("noahEnhancedDeadStep");
+
+	console.timeEnd("noahEnhancedStartStep");
+
+	console.log('noahs iterate count (10^5)', noahIterateCount / 100000);
 	//console.log('endingLength', reducedLength);	
 
-	// build new state matrix: all results with c = 3, or c = 4 && alive are saved, else if alive saved in killed matrix.
-	// let newState = new State();
-	// let killedMatrix = [[],[]];
-	// for (let i = 0; i < reducedLength; i++){
-	// 	let count = results[2][i];
-	// 	let wasAlive = results[3][i];
-	// 	if (count === 3 || (count === 4 && wasAlive)){
-	// 		newState.push(xref[i], yref[i]);
-	// 	} else if (wasAlive){
-	// 		//console.log('pushing', elem[0], elem[1]);
-	// 		killedMatrix[0].push(xref[i]);
-	// 		killedMatrix[1].push(yref[i]);
-	// 	}
-	// }
-	// //console.log('killedmatrix',killedMatrix[0],killedMatrix[1]);
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
-	// //console.log('new matrix', newState.matrix);
-	// state.matrix = newState.matrix;
-	// state.minMaxes = newState.minMaxes;
+	state.matrix = newState;
+	//state.minMaxes = newState.minMaxes;
+	state.refreshMinMaxes;
+
+	if (cfg.deadCellType) {
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
 }
 
 let scottIterateCount = 0;
@@ -1125,17 +1169,19 @@ function stepState(steps = 1) {
 	scottIterateCount = 0;
 	scottsStepper();
 	console.timeEnd("scottStep");
-	//console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
-	console.time("noahEnhancedStep");
+	console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
 	noahStepper2();
+
+	console.log('                    ');
 
 	console.time("scottStep");
 	scottIterateCount = 0;
 	scottsStepper();
 	console.timeEnd("scottStep");
-	//console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
-	console.time("noahEnhancedStep");
+	console.log('scotts iteration count(10^5)',scottIterateCount / 100000)
 	noahStepper2();
+
+	console.log('                    ');
 
 	if (steps > 1) {
 		return stepState(--steps); // repeat
