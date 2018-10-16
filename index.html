@@ -19,6 +19,7 @@
             <button onclick="loadPattern()">Wiki Pattern</button>
             <button id="randomButton" onclick="random()">Random</button>
             <br>
+            <button onclick="console.time('t');stepState(100);console.timeEnd('t');drawState()">Step100</button>
             <button onclick="drawState(stepState(1))">Step forward</button>
             <button onclick="stepBack()">Step back</button>
             <button id="runButton" onclick="run()">Run</button>

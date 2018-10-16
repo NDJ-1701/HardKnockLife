@@ -693,71 +693,54 @@ console.time("its");
 			[]
 		];
 		const newState = new State();
-		let bounds = {
-			xmin: state.xMin,
-			xmax: state.xMax,
-			ymin: state.yMin,
-			ymax: state.yMax
-		};
-		// determine which cells are neighbors to the specified cell, and increment their 'touched' counter
-		function touch(xo, yo) {
-			for (let y = yo - 1; y <= yo + 1; y++) {
-				for (let x = xo - 1; x <= xo + 1; x++) {
-					let index = paraInd(x, y, touched[0], touched[1]);
-					if (index === -1) { // if it's not in the touched list yet, add it
-						touched[0].push(x);
-						touched[1].push(y);
-						if (x !== xo || y !== yo) { // if it's a neighbor initialize with one touch and not alive
-							touched[2].push(1);
-							touched[3].push(false);
-						} // this isn't super DRY, but It was confusing when I tried to combine them
-						else { // if it's this cell itself, initialize with 0 touches and alive true
-							touched[2].push(0);
-							touched[3].push(true);
-						}
-					} else
-					if (x !== xo || y !== yo)
-						touched[2][index] += 1; // iff it's a neighbor, increment the counter
-					else
-						touched[3][index] = true; // iff it's the cell itself, make sure it's marked alive
-				}
-			}
-		}
-
-		for (let i = 0; i < state.x.length; i++) {
-			touch(state.x[i], state.y[i]); // increment counter for each adjacent living cell
-		}
-		for (let i = 0; i < touched[0].length; i++) { // check the counter to see how many adjacent cells are living
-			let x = touched[0][i];
-			let y = touched[1][i];
-			//let alive = -1 !== paraInd(x, y, state.x, state.y);
-			let alive = touched[3][i];
-			if (!alive && touched[2][i] === 3) { // if it's dead and has the right number of living neighbors, bring it to life
-				newState.push(x, y);
-			} else if (alive && 2 <= touched[2][i] && touched[2][i] <= 3) { // if it's alive and has the right number of living neighbors, keep it alive
-				newState.push(x, y);
-			} else if (alive) { // anything not explicitly added to newState by above rules will be dead, because each step initializes the aliveList to an empty array
-				killedMatrix[0].push(x);
-				killedMatrix[1].push(y);
-
-
-			}
-		}
-		if (steps > 1) {
-			return stepState(--steps); // repeat
-		}
-
-		// setting these props individually isn't really taking advantage of the multiple state objects
-		// we should probably be setting the properties of newstate in here and then replacing the entire state object
-
-		// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
+        
+        for (let i = 0; i < state.x.length; i++) {
+            let xo = state.x[i];
+            let yo = state.y[i];
+            for (let y = yo - 1; y <= yo + 1; y++) {
+                for (let x = xo - 1; x <= xo + 1; x++) {
+                    let key = 10000*x + y;//`${x},${y}`;//x +','+ y;  // int math is faster then string concat, but this will break if there are more than 10000 columns
+                    if (touched[key] === undefined) { 
+                        touched[key] = {x: x, y: y, n: 0, a: false};
+                    }
+                    if (x === xo && y === yo) {
+                        touched[key].a = true;
+                    }
+                    else {
+                        touched[key].n++;
+                    }
+                }
+            }
+        }
+         
+        for (let cell in touched) {
+            if (!touched[cell].a && touched[cell].n === 3) {
+                newState.push(touched[cell].x, touched[cell].y);
+            }
+            else if (touched[cell].a && 2 <= touched[cell].n && touched[cell].n <= 3) {
+                newState.push(touched[cell].x, touched[cell].y);
+            }
+                else if (touched[cell].a) {
+                    killedMatrix[0].push(touched[cell].x);
+                    killedMatrix[1].push(touched[cell].y);
+                }
+        }
+		
 		if (cfg.deadCellType) {
 			state.deadMatrices.unshift(killedMatrix);
 			if (state.deadMatrices.length > cfg.killedFadeOut)
 				state.deadMatrices.pop();
-		}
+        }
+
+        // setting these props individually isn't really taking advantage of the multiple state objects
+		// we should probably be setting the properties of newstate in here and then replacing the entire state object
+		// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
 		state.matrix = newState.matrix;
-		state.minMaxes = newState.minMaxes;
+        state.minMaxes = newState.minMaxes;
+
+        if (steps > 1) {
+			return stepState(--steps); // repeat
+		}
 	}
 
 } // Um, is that block really all I have to do to scope all my variables.?
