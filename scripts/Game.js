@@ -1015,52 +1015,64 @@ function maxStepperNoahMod(steps = 1){
 // for performance auditing. Place a perftick with a string naming the step at the beginning of the section
 // you want to audit. Place another perftick every step of the way; subsequent ticks will end the last step's
 // timer and start a new named timer. When you want to end a section and generate a report, call perfResults();
-let perfMap = [];
-function perfTick(name) {
-	perfMap.push([performance.now(), name]);
-}
 
-function addZeroes(num) {
-	var num = String(num);
-	// Convert input string to a number and store as a variable.
-	var value = Number(num);      
-	// Split the input string into two arrays containing integers/decimals
-	var res = num.split(".");     
-	// If there is no decimal point or only one decimal place found.
-	if(res.length == 1 || res[1].length < 3) { 
-		// Set the number to two decimal places
-		value = value.toFixed(2);
-	}
-	// Return updated or original number.
-	return value;
-}
-	
+const perfProto = {
+	tick: function (name) {
+		this.perfMap.push([performance.now(), name]);
+	},
+	printResults: function() {
+		let perfMap = this.perfMap;
+		this.tick("end point");
+		let total = perfMap[perfMap.length - 1][0] - perfMap[0][0]; // total time taken.
 
-function perfResults(){
-	perfTick("end point");
-	let total = perfMap[perfMap.length - 1][0] - perfMap[0][0]; // total time taken.
-	function isTwoDigits(test){
-		return (test/10 > 1);
+		// util functions
+		function isTwoDigits(test){
+			return (test/10 > 1);
+		}
+		function addZeroes(num) {
+			var num = String(num);
+			// Convert input string to a number and store as a variable.
+			var value = Number(num);      
+			// Split the input string into two arrays containing integers/decimals
+			var res = num.split(".");     
+			// If there is no decimal point or only one decimal place found.
+			if(res.length == 1 || res[1].length < 3) { 
+				// Set the number to two decimal places
+				value = value.toFixed(2);
+			}
+			// Return updated or original number.
+			return value;
+		}
+		//
+
+		console.log("--==== Performance Report ====-- " + this.reportName);
+		for (let i = 0; i < (perfMap.length - 1); i++) { // skip last element
+			let stepLengthMS = perfMap[i + 1][0] - perfMap[i][0];
+			stepLengthPercent = (Math.round(stepLengthMS/total * 100 * 100) / 100);
+			stepLengthPercent = addZeroes(stepLengthPercent);
+			if (!isTwoDigits(stepLengthPercent))
+				stepLengthPercent = " " + stepLengthPercent;
+			let stepName = perfMap[i][1];
+			console.log("    " + stepLengthPercent + " % " + stepName + " ");
+		}
+		console.log("--============================--");
+		// clear map so we can time different sections at a time, if we choose to reuse this perf.
+		perfMap = [];
 	}
-	console.log("--==== Performance Report ====--")
-	for (let i = 0; i < (perfMap.length - 1); i++) { // skip last element
-		let stepLengthMS = perfMap[i + 1][0] - perfMap[i][0];
-		stepLengthPercent = (Math.round(stepLengthMS/total * 100 * 100) / 100);
-		stepLengthPercent = addZeroes(stepLengthPercent);
-		if (!isTwoDigits(stepLengthPercent))
-			stepLengthPercent = " " + stepLengthPercent;
-		let stepName = perfMap[i][1];
-		console.log("    " + stepLengthPercent + " % " + stepName + " ");
-	}
-	console.log("--============================--")
-	// clear map so we can time different sections at a time.
-	perfMap = [];
+};
+function perf (reportName){
+	// performance report
+	let pr = Object.create(perfProto);
+	pr.perfMap = [];
+	pr.reportName = reportName;
+	return pr;
 }
 /// end performance auditing tools.
 
 function stackState(steps){
 	let stack = {};
-	perfTick("build stack");
+	let report = new perf("stackState");
+	report.tick("build stack");
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
 		let yo = state.y[i];
@@ -1072,7 +1084,7 @@ function stackState(steps){
 		}
 	}
 
-	perfTick("define functions");
+	report.tick("define functions");
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -1120,7 +1132,7 @@ function stackState(steps){
 		return touched;
 	}
 
-	perfTick("compute layers");
+	report.tick("compute layers");
 
 	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
 	stack[-100000000] = [];
@@ -1172,7 +1184,7 @@ function stackState(steps){
 		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
 	}
 
-	perfTick("get results");
+	report.tick("get results");
 
 	const newState = new State();
 	let killedMatrix = [[],[]];
@@ -1192,7 +1204,7 @@ function stackState(steps){
 		}
 	}
 	
-	perfTick("update state");
+	report.tick("update state");
 
 	if (cfg.deadCellType) {
 		state.deadMatrices.unshift(killedMatrix);
@@ -1203,7 +1215,7 @@ function stackState(steps){
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
 
-	perfResults();
+	report.printResults();
 
 	if (steps > 1) {
 		return stackState(--steps); // repeat
