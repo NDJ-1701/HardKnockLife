@@ -1012,10 +1012,10 @@ function maxStepperNoahMod(steps = 1){
 }
 
 
-// for performance auditing. Place a perftick with a string naming the step at the beginning of the section
+// for performance auditing. Create a new Perf(), place a perf.tick with a string naming the step at the beginning of the section
 // you want to audit. Place another perftick every step of the way; subsequent ticks will end the last step's
 // timer and start a new named timer. When you want to end a section and generate a report, call perfResults();
-
+// Compatible with recursion.
 const perfProto = {
 	tick: function (name) {
 		this.perfMap.push([performance.now(), name]);
@@ -1038,29 +1038,49 @@ const perfProto = {
 			// If there is no decimal point or only one decimal place found.
 			if(res.length == 1 || res[1].length < 3) { 
 				// Set the number to two decimal places
-				value = value.toFixed(2);
+				value = value.toFixed(3);
 			}
 			// Return updated or original number.
 			return value;
 		}
 		//
 
+		let originalOrder = []; // save original order of ticks
+		let accumulator = {}; // get accumulated milliseconds per named item
+		let totalTime = 0;
+		let recursions = -1;
+		for (let i = 0, len = perfMap.length - 1; i < len; i++){
+			originalOrder.push(perfMap[i][1]);
+			if (accumulator[perfMap[i][1]] === undefined)
+				accumulator[perfMap[i][1]] = 0;
+			let stepTime = perfMap[i + 1][0] - perfMap[i][0]
+			accumulator[perfMap[i][1]] += stepTime;
+			totalTime += stepTime;
+			if (perfMap[i][1] === perfMap[0][1]) // will give bad results if ticks are given identical names.
+				recursions++;
+		}
+
 		console.log("--==== Performance Report ====-- " + this.reportName);
-		for (let i = 0; i < (perfMap.length - 1); i++) { // skip last element
-			let stepLengthMS = perfMap[i + 1][0] - perfMap[i][0];
+		let iKeys = Object.keys(accumulator).length;
+		for (let i = 0; i < iKeys; i++) {
+			let stepName = originalOrder[i];
+			let stepLengthMS = accumulator[stepName];			
 			stepLengthPercent = (Math.round(stepLengthMS/total * 100 * 100) / 100);
 			stepLengthPercent = addZeroes(stepLengthPercent);
-			if (!isTwoDigits(stepLengthPercent))
+			if (!isTwoDigits(stepLengthPercent)) {
 				stepLengthPercent = " " + stepLengthPercent;
-			let stepName = perfMap[i][1];
-			console.log("    " + stepLengthPercent + " % " + stepName + " ");
+			}
+			console.log("    " + stepLengthPercent + " % " + stepName + "  (" + stepLengthMS.toFixed(2) + "ms)");
 		}
+		console.log("  --- Total Time: " + totalTime.toFixed(3) + "ms");
+		if (recursions > 0)
+			console.log("  --- Average recursion time: " + (totalTime/recursions).toFixed(3) + "ms");
 		console.log("--============================--");
 		// clear map so we can time different sections at a time, if we choose to reuse this perf.
 		perfMap = [];
 	}
 };
-function perf (reportName){
+function Perf (reportName = ""){
 	// performance report
 	let pr = Object.create(perfProto);
 	pr.perfMap = [];
@@ -1069,9 +1089,8 @@ function perf (reportName){
 }
 /// end performance auditing tools.
 
-function stackState(steps){
+function stackState(steps, report){
 	let stack = {};
-	let report = new perf("stackState");
 	report.tick("build stack");
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
@@ -1215,10 +1234,8 @@ function stackState(steps){
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
 
-	report.printResults();
-
 	if (steps > 1) {
-		return stackState(--steps); // repeat
+		return stackState(--steps, report); // repeat
 	}
 
 }
@@ -1509,7 +1526,9 @@ function stepState(steps = 1) {
 	// console.timeEnd("noah");
 
 //	console.time("stacker");
-	stackState(steps);
+	let report = new Perf("stackState");
+	stackState(200, report);
+	report.printResults();
 //	console.timeEnd("stacker");
 
 	// console.time("maxStep");
