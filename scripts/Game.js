@@ -140,6 +140,19 @@ let aCoupleDots = [
 	[0, 1, 1],
 	[1, 0, 1]
 ];
+let aHorizontalLine = [
+	[0, 0, 0],
+	[0, 1, 2]	
+];
+let aVerticalLine = [
+	[0, 1, 2],
+	[0, 0, 0]	
+];
+let broken = [[0, 0, 2],[0, 1, 2]];
+let someXvalues = [
+	[-2, 3, 1, 2, 0, 5, -1, -20, -20, 12],
+	[ 0, 0, 0, 0, 0, 0,  0, -20, 0, 0]
+];
 let gosperGliderGun = [
 	[14, 14, 15, 15, 24, 24, 24, 25, 26, 27, 25, 26, 27, 29, 30, 30, 30, 31, 29, 28, 34, 34, 34, 35, 35, 35, 36, 36, 38, 38, 38, 38, 48, 49, 49, 48],
 	[21, 22, 22, 21, 21, 22, 23, 20, 19, 19, 24, 25, 25, 24, 23, 22, 21, 22, 20, 22, 21, 20, 19, 19, 20, 21, 18, 22, 17, 18, 22, 23, 20, 20, 19, 19]
@@ -357,7 +370,6 @@ function arrayMin(arr) {
 // needed for finding isAlive and isTouched because native .includes matches by reference, not values
 function paraInd(x, y, xArray, yArray) {
 	for (let i = 0; i < xArray.length; i++){
-		maxIterateCount++;
 		if (xArray[i] === x){
 			if (yArray[i] === y)
 				return i;
@@ -913,16 +925,16 @@ function maxStepper2(steps = 1){
 
 function maxStepperNoahMod(steps = 1){
 
-	if (cfg.enableUndo) {
-		if (oldStates.length > cfg.maxUndo) {
-			oldStates.shift();
-		}
-		let oldState = new State();
-		oldState.init(state.matrix, state.comments);
-		oldState.xShift = state.xShift;
-		oldState.yShift = state.yShift;
-		oldStates.push(oldState);
-	}
+	// if (cfg.enableUndo) {
+	// 	if (oldStates.length > cfg.maxUndo) {
+	// 		oldStates.shift();
+	// 	}
+	// 	let oldState = new State();
+	// 	oldState.init(state.matrix, state.comments);
+	// 	oldState.xShift = state.xShift;
+	// 	oldState.yShift = state.yShift;
+	// 	oldStates.push(oldState);
+	// }
 
 	let touched = {}; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
 	let killedMatrix = [
@@ -981,22 +993,164 @@ function maxStepperNoahMod(steps = 1){
 		}
 	}
 	
+	// if (cfg.deadCellType) {
+	// 	state.deadMatrices.unshift(killedMatrix);
+	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
+	// 		state.deadMatrices.pop();
+	// }
+
+	// setting these props individually isn't really taking advantage of the multiple state objects
+	// we should probably be setting the properties of newstate in here and then replacing the entire state object
+	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
+
+	// state.matrix = newState.matrix;
+	// state.minMaxes = newState.minMaxes;
+
+	if (steps > 1) {
+		return maxStepperNoahMod(--steps); // repeat
+	}
+}
+
+function stackState(steps){
+	let stack = {};
+	for (let i = 0, len = state.x.length; i < len; i++) {
+		let xo = state.x[i];
+		let yo = state.y[i];
+		if (stack[xo] === undefined) { 
+			stack[xo] = [yo];
+		}
+		else {
+			stack[xo].push(yo)
+		}
+	}
+	
+	function layerResult(yarr){
+		let top = yarr[0];
+		let middle = yarr[1];
+		let bottom = yarr[2];
+
+		let touched = {};
+
+		function touchDead(key){
+			if (touched[key] === undefined) { 
+				touched[key] = {n: 1};
+			}
+			else {
+				touched[key].n++;
+			}
+		}
+		function touchAlive(key){
+			if (touched[key] === undefined) { 
+				touched[key] = {n: 1, a: true};
+			}
+			else {
+				touched[key].n++;
+				touched[key].a = true;
+			}
+		}
+
+		for (let i = 0, len = top.length; i < len; i++) {
+			let key = top[i];
+			touchDead(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+		for (let i = 0, len = bottom.length; i < len; i++) {
+			let key = bottom[i];
+			touchDead(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+		for (let i = 0, len = middle.length; i < len; i++) {
+			let key = middle[i];
+			touchAlive(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+		return touched;
+	}
+
+	// add empty arrays to end of stack to make iteration easier.
+	stack[-100000000] = [];
+	stack[-99999999] = [];
+	let xKeys = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
+	xKeys.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+
+	let results = []; // array of arrays
+	let lenX = xKeys.length;
+	// setup x vars
+	let xTop = 100000000; // doesn't matter, will immediately be overwritten.
+	let xMiddle = 100000000;
+	let xBottom = 100000000; 
+	// setup y arrays
+	let yTop = [];
+	let yMiddle = [];
+	let yBottom = [];
+	let yt;
+	let yb;
+
+	for (let i = 0; i < lenX; i++) {
+		// shift x numbers
+		xTop = xMiddle;
+		xMiddle = xBottom;
+		xBottom = Number(xKeys[i]); // this will always be lowest
+		// shift y layers
+		yTop = yMiddle;
+		yMiddle = yBottom;
+		yBottom = stack[xBottom];
+
+		
+		if (xTop != xMiddle + 1) {
+			if (xTop - 2 === xMiddle) { // "between" condition
+				results.push([xTop - 1, layerResult([yTop, [], yMiddle])]);
+			}				
+			else {// bottom / top condition
+				results.push([xMiddle + 1, layerResult([[], [], yMiddle])]);
+
+				if (yTop.length != 0)
+					results.push([xTop - 1, layerResult([yTop, [], []])]);
+			}
+		}
+
+		// do a middle layer
+		// if the layer ontop of us is 1 away, use it, else use empty
+		yt = (xMiddle + 1 === xTop)? yTop : [];
+		// if the layer below us is 1 away, use it else use empty
+		yb = (xMiddle - 1 === xBottom)? yBottom : [];
+		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
+	}
+
+	const newState = new State();
+	let killedMatrix = [[],[]];
+	let x; // our x value
+	for (let i = 0, len = results.length; i < len; i++) {
+		x = results[i][0];
+		yResults = results[i][1];
+		for (let yKey in yResults) {
+			
+			y = Number(yKey);
+			if (yResults[yKey].n === 3 || (yResults[yKey].n === 4 && yResults[yKey].a)){
+				newState.push(x,y);
+			} else if (yResults[yKey].a) {
+				killedMatrix[0].push(x);
+				killedMatrix[1].push(y);
+			}
+		}
+	}
+
 	if (cfg.deadCellType) {
 		state.deadMatrices.unshift(killedMatrix);
 		if (state.deadMatrices.length > cfg.killedFadeOut)
 			state.deadMatrices.pop();
 	}
 
-	// setting these props individually isn't really taking advantage of the multiple state objects
-	// we should probably be setting the properties of newstate in here and then replacing the entire state object
-	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
-
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return maxStepperNoahMod(--steps); // repeat
+		return stackState(--steps); // repeat
 	}
+
 }
 
 function maxStepperOneBigObject(steps = 1){
@@ -1102,7 +1256,7 @@ function maxStepperOneBigObject(steps = 1){
 			y = Number(yKey);
 			if (allX[yKey].n === 3 || (allX[yKey].n === 4 && allX[yKey].a)){
 				newState.push(x,y);
-			} else if (allX[y].a) {
+			} else if (allX[yKey].a) {
 				killedMatrix[0].push(x);
 				killedMatrix[1].push(y);
 			}
@@ -1280,9 +1434,13 @@ function stepState(steps = 1) {
 	// maxStepper2(50);
 	// console.timeEnd("maxStep");
 
-	//console.time("noah");
-	maxStepperNoahMod(steps);
-	//console.timeEnd("noah");
+	// console.time("noah");
+	// maxStepperNoahMod(50);
+	// console.timeEnd("noah");
+
+//	console.time("stacker");
+	stackState(steps);
+//	console.timeEnd("stacker");
 
 	// console.time("maxStep");
 	// maxStepper2(50);
