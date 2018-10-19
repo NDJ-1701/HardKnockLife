@@ -1074,7 +1074,7 @@ const perfProto = {
 		}
 		console.log("  --- Total Time: " + totalTime.toFixed(3) + "ms");
 		if (recursions > 0)
-			console.log("  --- Average recursion time: " + (totalTime/recursions).toFixed(3) + "ms");
+			console.log("  --- Average recursion time: " + (totalTime/recursions).toFixed(3) + "ms  (" + recursions + " rounds)");
 		console.log("--============================--");
 		// clear map so we can time different sections at a time, if we choose to reuse this perf.
 		perfMap = [];
@@ -1089,9 +1089,9 @@ function Perf (reportName = ""){
 }
 /// end performance auditing tools.
 
-function stackState(steps, report){
+function stackState(steps){
 	let stack = {};
-	report.tick("build stack");
+	//report.tick("build stack");
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
 		let yo = state.y[i];
@@ -1103,7 +1103,7 @@ function stackState(steps, report){
 		}
 	}
 
-	report.tick("define functions");
+	//report.tick("define functions");
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -1151,7 +1151,7 @@ function stackState(steps, report){
 		return touched;
 	}
 
-	report.tick("compute layers");
+	//report.tick("compute layers");
 
 	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
 	stack[-100000000] = [];
@@ -1203,7 +1203,7 @@ function stackState(steps, report){
 		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
 	}
 
-	report.tick("get results");
+	//report.tick("get results");
 
 	const newState = new State();
 	let killedMatrix = [[],[]];
@@ -1223,19 +1223,19 @@ function stackState(steps, report){
 		}
 	}
 	
-	report.tick("update state");
+	//report.tick("update state");
 
-	if (cfg.deadCellType) {
-		state.deadMatrices.unshift(killedMatrix);
-		if (state.deadMatrices.length > cfg.killedFadeOut)
-			state.deadMatrices.pop();
-	}
+	// if (cfg.deadCellType) {
+	// 	state.deadMatrices.unshift(killedMatrix);
+	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
+	// 		state.deadMatrices.pop();
+	// }
 
-	state.matrix = newState.matrix;
-	state.minMaxes = newState.minMaxes;
+	// state.matrix = newState.matrix;
+	// state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return stackState(--steps, report); // repeat
+		return stackState(--steps); // repeat
 	}
 
 }
@@ -1521,14 +1521,19 @@ function stepState(steps = 1) {
 	// maxStepper2(50);
 	// console.timeEnd("maxStep");
 
-	// console.time("noah");
-	// maxStepperNoahMod(50);
-	// console.timeEnd("noah");
 
-//	console.time("stacker");
-	let report = new Perf("stackState");
-	stackState(200, report);
-	report.printResults();
+	let maxReport = new Perf("max STEPPER MOD NOAH");
+	maxReport.tick("iteration");
+	maxStepperNoahMod(100);
+	maxReport.printResults();
+
+	let report2 = new Perf("STACK STATE");
+	report2.tick("iteration");
+	//let report = new Perf("stackState");
+	stackState(100);
+	//report2.tick('end');
+	//report.printResults();
+	report2.printResults();
 //	console.timeEnd("stacker");
 
 	// console.time("maxStep");
@@ -1539,9 +1544,10 @@ function stepState(steps = 1) {
 	// maxStepperNoahMod(50);
 	// console.timeEnd("noah");
 
-	// console.time("noahBigO");
-	// maxStepperOneBigObject(50);
-	// console.timeEnd("noahBigO");
+	let maxReport1 = new Perf("BIG OBJECT");
+	maxReport1.tick("iteration");
+	maxStepperOneBigObject(100);
+	maxReport1.printResults();
 
 	if (steps > 1) {
 		return stepState(--steps); // repeat
