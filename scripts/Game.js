@@ -1011,8 +1011,56 @@ function maxStepperNoahMod(steps = 1){
 	}
 }
 
+
+// for performance auditing. Place a perftick with a string naming the step at the beginning of the section
+// you want to audit. Place another perftick every step of the way; subsequent ticks will end the last step's
+// timer and start a new named timer. When you want to end a section and generate a report, call perfResults();
+let perfMap = [];
+function perfTick(name) {
+	perfMap.push([performance.now(), name]);
+}
+
+function addZeroes(num) {
+	var num = String(num);
+	// Convert input string to a number and store as a variable.
+	var value = Number(num);      
+	// Split the input string into two arrays containing integers/decimals
+	var res = num.split(".");     
+	// If there is no decimal point or only one decimal place found.
+	if(res.length == 1 || res[1].length < 3) { 
+		// Set the number to two decimal places
+		value = value.toFixed(2);
+	}
+	// Return updated or original number.
+	return value;
+}
+	
+
+function perfResults(){
+	perfTick("end point");
+	let total = perfMap[perfMap.length - 1][0] - perfMap[0][0]; // total time taken.
+	function isTwoDigits(test){
+		return (test/10 > 1);
+	}
+	console.log("--==== Performance Report ====--")
+	for (let i = 0; i < (perfMap.length - 1); i++) { // skip last element
+		let stepLengthMS = perfMap[i + 1][0] - perfMap[i][0];
+		stepLengthPercent = (Math.round(stepLengthMS/total * 100 * 100) / 100);
+		stepLengthPercent = addZeroes(stepLengthPercent);
+		if (!isTwoDigits(stepLengthPercent))
+			stepLengthPercent = " " + stepLengthPercent;
+		let stepName = perfMap[i][1];
+		console.log("    " + stepLengthPercent + " % " + stepName + " ");
+	}
+	console.log("--============================--")
+	// clear map so we can time different sections at a time.
+	perfMap = [];
+}
+/// end performance auditing tools.
+
 function stackState(steps){
 	let stack = {};
+	perfTick("build stack");
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
 		let yo = state.y[i];
@@ -1023,6 +1071,8 @@ function stackState(steps){
 			stack[xo].push(yo)
 		}
 	}
+
+	perfTick("define functions");
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -1070,7 +1120,9 @@ function stackState(steps){
 		return touched;
 	}
 
-	// add empty arrays to end of stack to make iteration easier.
+	perfTick("compute layers");
+
+	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
 	stack[-100000000] = [];
 	stack[-99999999] = [];
 	let xKeys = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
@@ -1079,7 +1131,7 @@ function stackState(steps){
 	let results = []; // array of arrays
 	let lenX = xKeys.length;
 	// setup x vars
-	let xTop = 100000000; // doesn't matter, will immediately be overwritten.
+	let xTop = 100000000; // doesn't matter, will immediately be overwritten, and is empty anyway.
 	let xMiddle = 100000000;
 	let xBottom = 100000000; 
 	// setup y arrays
@@ -1120,6 +1172,8 @@ function stackState(steps){
 		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
 	}
 
+	perfTick("get results");
+
 	const newState = new State();
 	let killedMatrix = [[],[]];
 	let x; // our x value
@@ -1137,6 +1191,8 @@ function stackState(steps){
 			}
 		}
 	}
+	
+	perfTick("update state");
 
 	if (cfg.deadCellType) {
 		state.deadMatrices.unshift(killedMatrix);
@@ -1146,6 +1202,8 @@ function stackState(steps){
 
 	state.matrix = newState.matrix;
 	state.minMaxes = newState.minMaxes;
+
+	perfResults();
 
 	if (steps > 1) {
 		return stackState(--steps); // repeat
