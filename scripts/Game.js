@@ -493,6 +493,11 @@ function checkIncreaseCellSize(increased = false, zoom = false, targetSize = nul
 		// if there is enough space to increase the cell size and have a border with at least 5 squares, decrease cell size.
 		let newCellSize = (zoom) ? (targetSize != null) ? targetSize : state.cellSize + 1 : state.cellSize * 2;
 		if (newCellSize <= cfg.maximumCellSize) {
+
+			//sanity checks
+			if (newCellSize > 1)
+				newCellSize = Math.round(newCellSize);
+
 			state.changeCellSizeTo(newCellSize);
 			if (targetSize != null)
 				return checkIncreaseCellSize(true);
