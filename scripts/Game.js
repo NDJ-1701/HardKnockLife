@@ -58,7 +58,7 @@ console.time("its");
 let cfg = {
 	initialCellSize: 12, // valid cell sizes are: 1,2,4,8,16,32,64
 	maximumCellSize: 64,
-	minimumCellSize: 1,
+	minimumCellSize: .25,
 	defaultTickRate: 250, // must be either: 4000, 2000, 1000, 500, 250, 125, 63, 31, 16, 8, 4, 2
 	get tickRate() {
 		return this.defaultTickRate;
@@ -410,6 +410,10 @@ function clearButton() {
 	drawState();
 }
 
+function saveButton() {
+	state.save();
+}
+
 function loadPattern(index = false) {
 	state.clear();
 	let shiftState = cfg.shiftLock; // save the setting so we can set it back
@@ -461,13 +465,17 @@ function random() {
 }
 
 function checkReduceCellSize(decreased = false, zoom = false, targetSize = null) {
-	if (state.cellSize != 1) {
+	if (state.cellSize != cfg.minimumCellSize) {
 		if (zoom || (!cfg.shiftLock && (state.cellsWide >= state.gridWidth || state.cellsTall >= state.gridHeight))) {
 			// if we cannot fit the entire pattern inside the grid with one square to spare, increase grid size
-			let newCellSize = (zoom) ? (targetSize != null) ? targetSize : state.cellSize - 1 : state.cellSize / 2;
+			let newCellSize = (zoom) ? (targetSize != null) ? targetSize : (state.cellSize > 1)? state.cellSize - 1 : state.cellSize - 0.25 : state.cellSize / 2;
 
-			if (newCellSize < 2)
-				newCellSize = 1;
+			//sanity checks
+			if (newCellSize > 1)
+				newCellSize = Math.round(newCellSize);
+			else if (newCellSize < (cfg.minimumCellSize + 0.25) || newCellSize < cfg.minimumCellSize)
+				newCellSize = cfg.minimumCellSize;
+
 			if (newCellSize >= cfg.minimumCellSize) {
 				state.changeCellSizeTo(newCellSize);
 				if (targetSize == null)
@@ -722,7 +730,7 @@ function drawState() {
 
 		// set new cell size and shift value
 		if (!cfg.shiftLock) {
-			if (state.cellSize != 1) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
+			if (state.cellSize != cfg.minimumCellSize) // don't bother shifting 1 pixel cells, we've probably auto zoomed out to here.
 			{
 				state.checkResetShiftValues();
 			}
@@ -858,18 +866,22 @@ function stepBack() {
 	}
 }
 
-function maxStepper2(steps = 1){
+function maxStepper2(steps = 1, r){
 
-	// if (cfg.enableUndo) {
-	// 	if (oldStates.length > cfg.maxUndo) {
-	// 		oldStates.shift();
-	// 	}
-	// 	let oldState = new State();
-	// 	oldState.init(state.matrix, state.comments);
-	// 	oldState.xShift = state.xShift;
-	// 	oldState.yShift = state.yShift;
-	// 	oldStates.push(oldState);
-	// }
+	r.tick('update undo');
+
+	if (cfg.enableUndo) {
+		if (oldStates.length > cfg.maxUndo) {
+			oldStates.shift();
+		}
+		let oldState = new State();
+		oldState.init(state.matrix, state.comments);
+		oldState.xShift = state.xShift;
+		oldState.yShift = state.yShift;
+		oldStates.push(oldState);
+	}
+
+	r.tick('initial setup');
 
 	let touched = {}; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
 	let killedMatrix = [
@@ -877,6 +889,8 @@ function maxStepper2(steps = 1){
 		[]
 	];
 	const newState = new State();
+
+	r.tick('compute touches')
 	
 	for (let i = 0; i < state.x.length; i++) {
 		let xo = state.x[i];
@@ -896,6 +910,8 @@ function maxStepper2(steps = 1){
 			}
 		}
 	}
+
+	r.tick("compute results");
 	 
 	for (let cell in touched) {
 		if (!touched[cell].a && touched[cell].n === 3) {
@@ -910,36 +926,43 @@ function maxStepper2(steps = 1){
 			}
 	}
 	
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
+	if (cfg.deadCellType) {
+		r.tick('update dead cells');
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
 
 	// setting these props individually isn't really taking advantage of the multiple state objects
 	// we should probably be setting the properties of newstate in here and then replacing the entire state object
 	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
 
-	// state.matrix = newState.matrix;
-	// state.minMaxes = newState.minMaxes;
+	r.tick('update state');
+
+	state.matrix = newState.matrix;
+	state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return maxStepper2(--steps); // repeat
+		return maxStepper2(--steps, r); // repeat
 	}
 }
 
-function maxStepperNoahMod(steps = 1){
+function maxStepperNoahMod(steps = 1, r){
 
-	// if (cfg.enableUndo) {
-	// 	if (oldStates.length > cfg.maxUndo) {
-	// 		oldStates.shift();
-	// 	}
-	// 	let oldState = new State();
-	// 	oldState.init(state.matrix, state.comments);
-	// 	oldState.xShift = state.xShift;
-	// 	oldState.yShift = state.yShift;
-	// 	oldStates.push(oldState);
-	// }
+	r.tick('update undo');
+
+	if (cfg.enableUndo) {
+		if (oldStates.length > cfg.maxUndo) {
+			oldStates.shift();
+		}
+		let oldState = new State();
+		oldState.init(state.matrix, state.comments);
+		oldState.xShift = state.xShift;
+		oldState.yShift = state.yShift;
+		oldStates.push(oldState);
+	}
+
+	r.tick('initial setup');
 
 	let touched = {}; //[[x],[y],[n],[a]]  n = times touched, a = alive(bool)
 	let killedMatrix = [
@@ -968,8 +991,9 @@ function maxStepperNoahMod(steps = 1){
 			touched[key].a = true;
 		}
 	}
+
+	r.tick('compute touches')
 	
-	// touch adjacent cells first, all will be "dead"
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
 		let yo = state.y[i];
@@ -983,6 +1007,8 @@ function maxStepperNoahMod(steps = 1){
 			toucherDead(xo + 1, y); // right side
 		}
 	}
+
+	r.tick('compute results');
 	 
 	for (let cell in touched) {
 		if (touched[cell].n === 3){
@@ -998,21 +1024,24 @@ function maxStepperNoahMod(steps = 1){
 		}
 	}
 	
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
+	if (cfg.deadCellType) {
+		r.tick('update dead cells');
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
 
 	// setting these props individually isn't really taking advantage of the multiple state objects
 	// we should probably be setting the properties of newstate in here and then replacing the entire state object
 	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
 
-	// state.matrix = newState.matrix;
-	// state.minMaxes = newState.minMaxes;
+	r.tick('update state');
+
+	state.matrix = newState.matrix;
+	state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return maxStepperNoahMod(--steps); // repeat
+		return maxStepperNoahMod(--steps, r); // repeat
 	}
 }
 
@@ -1053,7 +1082,7 @@ const perfProto = {
 		let originalOrder = []; // save original order of ticks
 		let accumulator = {}; // get accumulated milliseconds per named item
 		let totalTime = 0;
-		let recursions = -1;
+		let recursions = 0;
 		for (let i = 0, len = perfMap.length - 1; i < len; i++){
 			originalOrder.push(perfMap[i][1]);
 			if (accumulator[perfMap[i][1]] === undefined)
@@ -1078,7 +1107,7 @@ const perfProto = {
 			console.log("    " + stepLengthPercent + " % " + stepName + "  (" + stepLengthMS.toFixed(2) + "ms)");
 		}
 		console.log("  --- Total Time: " + totalTime.toFixed(3) + "ms");
-		if (recursions > 0)
+		if (recursions > 1)
 			console.log("  --- Average recursion time: " + (totalTime/recursions).toFixed(3) + "ms  (" + recursions + " rounds)");
 		console.log("--============================--");
 		// clear map so we can time different sections at a time, if we choose to reuse this perf.
@@ -1094,9 +1123,24 @@ function Perf (reportName = ""){
 }
 /// end performance auditing tools.
 
-function stackState(steps){
-	let stack = {};
-	//report.tick("build stack");
+function stackState(steps, r){
+
+	r.tick('update undo');
+
+	if (cfg.enableUndo) {
+		if (oldStates.length > cfg.maxUndo) {
+			oldStates.shift();
+		}
+		let oldState = new State();
+		oldState.init(state.matrix, state.comments);
+		oldState.xShift = state.xShift;
+		oldState.yShift = state.yShift;
+		oldStates.push(oldState);
+	}
+
+	r.tick("build stack");
+
+	let stack = {};	
 	for (let i = 0, len = state.x.length; i < len; i++) {
 		let xo = state.x[i];
 		let yo = state.y[i];
@@ -1107,8 +1151,6 @@ function stackState(steps){
 			stack[xo].push(yo)
 		}
 	}
-
-	//report.tick("define functions");
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -1156,7 +1198,7 @@ function stackState(steps){
 		return touched;
 	}
 
-	//report.tick("compute layers");
+	r.tick("setup initial variables");
 
 	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
 	stack[-100000000] = [];
@@ -1176,6 +1218,8 @@ function stackState(steps){
 	let yBottom = [];
 	let yt;
 	let yb;
+
+	r.tick('compute layers');
 
 	for (let i = 0; i < lenX; i++) {
 		// shift x numbers
@@ -1208,7 +1252,7 @@ function stackState(steps){
 		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
 	}
 
-	//report.tick("get results");
+	r.tick("compute results");
 
 	const newState = new State();
 	let killedMatrix = [[],[]];
@@ -1228,35 +1272,42 @@ function stackState(steps){
 		}
 	}
 	
-	//report.tick("update state");
+	
 
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
+	if (cfg.deadCellType) {
+		r.tick('update dead cells');
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
 
-	// state.matrix = newState.matrix;
-	// state.minMaxes = newState.minMaxes;
+	r.tick("update state");
+
+	state.matrix = newState.matrix;
+	state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return stackState(--steps); // repeat
+		return stackState(--steps, r); // repeat
 	}
 
 }
 
-function maxStepperOneBigObject(steps = 1){
+function maxStepperOneBigObject(steps = 1, r){
 
-	// if (cfg.enableUndo) {
-	// 	if (oldStates.length > cfg.maxUndo) {
-	// 		oldStates.shift();
-	// 	}
-	// 	let oldState = new State();
-	// 	oldState.init(state.matrix, state.comments);
-	// 	oldState.xShift = state.xShift;
-	// 	oldState.yShift = state.yShift;
-	// 	oldStates.push(oldState);
-	// }
+	r.tick('update undo');
+
+	if (cfg.enableUndo) {
+		if (oldStates.length > cfg.maxUndo) {
+			oldStates.shift();
+		}
+		let oldState = new State();
+		oldState.init(state.matrix, state.comments);
+		oldState.xShift = state.xShift;
+		oldState.yShift = state.yShift;
+		oldStates.push(oldState);
+	}
+
+	r.tick("build object");
 
 	let results = {}; //{x:{y:,n:,a:]  n = times touched, a = alive(bool)
 
@@ -1303,6 +1354,8 @@ function maxStepperOneBigObject(steps = 1){
 			}
 		}
 	}
+
+	r.tick('compute touches')
 	
 	for (i = 0; i < length; i++) {
 		// add left side
@@ -1317,25 +1370,7 @@ function maxStepperOneBigObject(steps = 1){
 		}
 	} 
 
-	// const newState = new State();
-	// let killedMatrix = [[],[]];
-	// let xKeys = Object.keys(results);
-	// let x;
-	// let y;
-	// for (let i = 0,lenx = xKeys.length; i < lenx; i++){
-	// 	x = Number(xKeys[i]);
-	// 	let allX = results[x];
-	// 	let yKeys = Object.keys(allX);
-	// 	for (let e = 0, leny = yKeys.length; e < leny; e++){
-	// 		y = Number(yKeys[e]);
-	// 		if (allX[y].n === 3 || (allX[y].n === 4 && allX[y].a)){
-	// 			newState.push(x,y);
-	// 		} else if (allX[y].a) {
-	// 			killedMatrix[0].push(x);
-	// 			killedMatrix[1].push(y);
-	// 		}
-	// 	}
-	// }
+	r.tick("compute results");
 
 	const newState = new State();
 	let killedMatrix = [[],[]];
@@ -1357,202 +1392,54 @@ function maxStepperOneBigObject(steps = 1){
 
 
 	
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
+	if (cfg.deadCellType) {
+		r.tick('update dead cells');
+		state.deadMatrices.unshift(killedMatrix);
+		if (state.deadMatrices.length > cfg.killedFadeOut)
+			state.deadMatrices.pop();
+	}
 
-	// setting these props individually isn't really taking advantage of the multiple state objects
-	// we should probably be setting the properties of newstate in here and then replacing the entire state object
-	// indeed failing to re-initialize the whole state means the shadows arent getting cleared on "reset" button or "clear" button etc.
+	r.tick('update state');
 
-	//console.log(newState.matrix);
-
-	// state.matrix = newState.matrix;
-	// state.minMaxes = newState.minMaxes;
-
-	// state.matrix = newStateMatrix;
-	// state.refreshMinMaxes();
-	// state.minMaxes = newState.minMaxes;
-	// state.resetShiftValues();
-	// console.log('new matrix', state.matrix);
-	// if (steps > 1) {
-	// 	return stepState(--steps); // repeat
-	// }
+	state.matrix = newState.matrix;
+	state.minMaxes = newState.minMaxes;
 
 	if (steps > 1) {
-		return maxStepperOneBigObject(--steps); // repeat
+		return maxStepperOneBigObject(--steps, r); // repeat
 	}
 }
 
-function noahStepper2(){
-	console.time("noahEnhancedStartStep");
-
-	let results = [[],[],[]]; // [[x],[y],[c]]
-	//let newState = new State();
-	let newState = [[],[]];
-	let killedMatrix = [[],[]];
-	// fill results matrix with current state cells, adding alive attribute
-	results[0] = state.x.slice(); // in the final version, we could trash the original to save operations, if that mattered.
-	results[1] = state.y.slice();
-	const xLen = state.x.length;
-
-	// fill results matrix with surrounding "touched" pairs
-	let xref = results[0]; // x array reference, so I don't have to type as much.
-	let yref = results[1]; // y array reference, so I don't have to type as much.
-	for (let i = 0; i < xLen; i ++ ){
-		let x = xref[i]; let y = yref[i];
-		xref.push(x); yref.push(y - 1); // top middle
-		xref.push(x); yref.push(y + 1); // bottom middle
-		for (let p = -1; p <= 1; p++){
-			xref.push(x - 1); yref.push(y + p); // left side
-			xref.push(x + 1); yref.push(y + p); // right side
-		}		
-	}
-
-	function checkWasAliveCell(i){
-		let count = results[2][i];
-		if (count === 3 || (count === 4)){
-			//newState.push(xref[i], yref[i]);
-			newState[0].push(xref[i]);
-			newState[1].push(yref[i]);
-		} else {
-			killedMatrix[0].push(xref[i]);
-			killedMatrix[1].push(yref[i]);
-		}
-	}
-
-	function checkWasDeadCell(i){
-		let count = results[2][i];
-		if (count === 3){
-			//newState.push(xref[i], yref[i]);
-			newState[0].push(xref[i]);
-			newState[1].push(yref[i]);
-		}
-	}
-
-	// for each pair in results, combine matching pairs, remove matches as they are found so they are counted only once.
-	function packArrayAlive(startingIndex, length) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
-		let xMatch = xref[startingIndex];
-		let yMatch = yref[startingIndex];
-		var i = xLen;
-		do {
-			let xTest = xref[i];
-			if (xTest === xMatch && yref[i] === yMatch){
-				results[2][startingIndex]++;
-				xref[i] = xref[length - 1];
-				yref[i] = yref[length - 1];
-				xref.pop();
-				yref.pop();
-				length--;
-			}
-			else
-				i++;
-		} while (i < length);
-		checkWasAliveCell(startingIndex);
-	}
-
-	
-	function packArrayDead(startingIndex, length) { // perform operations on an array, and shift items to remove elements so they won't be looked at again.
-		let xMatch = xref[startingIndex];
-		let yMatch = yref[startingIndex];
-		var i = startingIndex + 1;
-		do {
-			let xTest = xref[i];
-			if (xTest === xMatch && yref[i] === yMatch){
-				results[2][startingIndex]++;
-				xref[i] = xref[length - 1];
-				yref[i] = yref[length - 1];
-				xref.pop();
-				yref.pop();
-				length--;
-			}
-			else
-				i++;
-		} while (i < length);
-		checkWasDeadCell(startingIndex);
-	}
-
-
-
-	// an enhancement would be to break the checking loop if we are too far from the current location, which would require an ordered array (it is already partially ordered, so perhaps this isn't a big prob)
-	// for instance, if we are 2x and 2y away from the square we are checking, perhaps we don't need to check further for touches.
-	// maybe during "touch" incrementer, if it is 5, throw it away immediately?
-	// * sort entire matrix (pre-touch) into arrays at a X location (representing layers). only check against above and below layer. These layers could be sorted for ignorring Y of too great.
-	// * these layers could also be used to divide the grid into smaller sections to ignore distant sections.
-
-	let reducedLength = xref.length;
-	// console.time("noahEnhancedAliveStep");
-	// console.time("noahEnhancedStep");
-
-	for (let i = 0; i < xLen; i ++ ){ // this loop is only for checking alive cells.
-		results[2][i] = 1; // initialize count by including self.
-		packArrayAlive(i, reducedLength); // count other touches.
-		reducedLength = xref.length; // update new length
-	}
-
-	// console.timeEnd("noahEnhancedAliveStep");
-	// console.time("noahEnhancedDeadStep");
-	// console.time("noahEnhancedStep");
-
-	for (let i = xLen; i < (reducedLength - 1); i ++ ){ // results.length must be re-evaluated every time, as it is on this line, because it changes in the function called.
-		results[2][i] = 1; // initialize count by including self.
-		packArrayDead(i, reducedLength); // count other touches.
-		reducedLength = xref.length; // update new length
-	}
-
-	//console.timeEnd("noahEnhancedDeadStep");
-
-	console.timeEnd("noahEnhancedStartStep");
-
-	//console.log('endingLength', reducedLength);	
-
-	// state.matrix = newState;
-	// //state.minMaxes = newState.minMaxes;
-	// state.refreshMinMaxes;
-
-	// if (cfg.deadCellType) {
-	// 	state.deadMatrices.unshift(killedMatrix);
-	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
-	// 		state.deadMatrices.pop();
-	// }
-}
+let debugReport = new Perf("debugreport");
 
 /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
 function stepState(steps = 1) {
 
-	// console.time("maxStep");
-	// maxStepper2(50);
-	// console.timeEnd("maxStep");
+	// state.save(); let report2 = new Perf("maxStepper2") 
+	// maxStepper2(50, report2);
+	// report2.printResults();
+
+	// state.reset();
+
+	// let report3 = new Perf("maxStepperNoahMod")
+	// maxStepperNoahMod(50, report3);
+	// report3.printResults();
+
+	// state.reset();
+
+	// let report1 = new Perf("stackState");
+	// stackState(50, report1);
+	// report1.printResults();
+
+	// state.reset();
+
+	// let report4 = new Perf("OneBigObject");
+	// maxStepperOneBigObject(50, report4);
+	// report4.printResults();
+
+	// state.reset();
 
 
-	// let maxReport = new Perf("max STEPPER MOD NOAH");
-	// maxReport.tick("iteration");
-	// maxStepperNoahMod(1);
-	// maxReport.printResults();
-
-	let report2 = new Perf("STACK STATE");
-	report2.tick("iteration");
-	//let report = new Perf("stackState");
-	stackState(1);
-	//report2.tick('end');
-	//report.printResults();
-	report2.printResults();
-//	console.timeEnd("stacker");
-
-	// console.time("maxStep");
-	// maxStepper2(50);
-	// console.timeEnd("maxStep");
-
-	// console.time("noah");
-	// maxStepperNoahMod(50);
-	// console.timeEnd("noah");
-
-	let maxReport1 = new Perf("BIG OBJECT");
-	maxReport1.tick("iteration");
-	maxStepperOneBigObject(1);
-	maxReport1.printResults();
+	stackState(steps, debugReport);
 
 	if (steps > 1) {
 		return stepState(--steps); // repeat
