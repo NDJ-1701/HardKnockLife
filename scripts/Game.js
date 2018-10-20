@@ -410,12 +410,17 @@ function clearButton() {
 	drawState();
 }
 
-function loadPattern() {
+function loadPattern(index = false) {
 	state.clear();
 	let shiftState = cfg.shiftLock; // save the setting so we can set it back
 	cfg.shiftLock = false;
 	const newState = new State();
-	parseRLE(patternsArray[getRandomInt(patternsArray.length - 1)], newState);
+	if (index) {
+		parseRLE(patternsArray[index], newState);
+	}
+	else {
+	parseRLE(patternsArray[getRandomInt(patternsArray.length - 2)], newState);
+	}
 	state.init(newState.matrix);
 	state.setComments(newState.comments);
 	console.log('loaded matrix', state.matrix); // may as well keep this here. It provides a way to print a saved matrix (to the dev console) so you can export it.
@@ -1522,15 +1527,15 @@ function stepState(steps = 1) {
 	// console.timeEnd("maxStep");
 
 
-	let maxReport = new Perf("max STEPPER MOD NOAH");
-	maxReport.tick("iteration");
-	maxStepperNoahMod(100);
-	maxReport.printResults();
+	// let maxReport = new Perf("max STEPPER MOD NOAH");
+	// maxReport.tick("iteration");
+	// maxStepperNoahMod(1);
+	// maxReport.printResults();
 
 	let report2 = new Perf("STACK STATE");
 	report2.tick("iteration");
 	//let report = new Perf("stackState");
-	stackState(100);
+	stackState(1);
 	//report2.tick('end');
 	//report.printResults();
 	report2.printResults();
@@ -1546,7 +1551,7 @@ function stepState(steps = 1) {
 
 	let maxReport1 = new Perf("BIG OBJECT");
 	maxReport1.tick("iteration");
-	maxStepperOneBigObject(100);
+	maxStepperOneBigObject(1);
 	maxReport1.printResults();
 
 	if (steps > 1) {
