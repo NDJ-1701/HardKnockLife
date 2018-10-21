@@ -3,6 +3,7 @@ bugs:
 	scrolling web page will cause zoom to occur. Perhaps we should make the user hold shift or something when mouse wheel zooming.
 	resizing the window after initial canvas setup will distort cell sizes.
 	when cell sizes get very small, they may disappear etc. Make sure 1 pixel cells works as intended in all display modes.
+	add a block for stepstate when there are no cells; test with very few cells, like 1 or 2.
 
 questions / comments:
 	let newCellSize = cellSizeInput.value; // wut? why does this work? we magically have access to the html cellSizeInput element without assigning it to anything?
@@ -767,7 +768,8 @@ function tickrateByInput() {
 function stepRecursively() {
 	if (running) {
 		//console.timeEnd("newstep");
-		stepState();
+		if (stepDone)
+			stepState();
 		window.setTimeout(stepRecursively, cfg.tickRate); // this line allows the tickrate to be re-evaluated.
 		//console.time("newstep");
 	}
@@ -783,7 +785,8 @@ function refreshTime() {
 function drawRecursively() {
 	if (running) {
 		//console.timeEnd("draw");
-		drawState();
+		if (stepDone)	
+			drawState();
 		window.setTimeout(drawRecursively, refreshTime()); // this line allows the tickrate to be re-evaluated.
 		//console.time("draw");
 	}
@@ -800,7 +803,8 @@ function run() {
 		//console.time("newstep");
 		stepRecursively();
 		//console.time("draw");
-		drawRecursively();
+
+		//drawRecursively();
 	} else
 		button.innerText = "Run";
 }
@@ -1128,8 +1132,12 @@ function Perf (reportName = ""){
 }
 /// end performance auditing tools.
 
-function stackState(steps, r){
 
+
+
+let stepDone = true;
+function stackState(steps, r){
+	stepDone = false;
 	r.tick('update undo');
 
 	if (cfg.enableUndo) {
@@ -1156,144 +1164,231 @@ function stackState(steps, r){
 			stack[xo].push(yo)
 		}
 	}
-	
-	function layerResult(yarr){
-		let top = yarr[0];
-		let middle = yarr[1];
-		let bottom = yarr[2];
 
-		let touched = {};
+	r.tick('get and sort keys');
 
-		function touchDead(key){
-			if (touched[key] === undefined) { 
-				touched[key] = {n: 1};
+	let xKeys1 = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
+	xKeys1.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+
+	if (window.Worker) { // Check if Browser supports the Worker api.
+		r.tick('sort stack');
+
+		function getSlice(lowerBound, upperBound){
+			let slicedOb = {};
+			for (i = lowerBound; i < upperBound; i++){
+				slicedOb[xKeys1[i]] = stack[xKeys1[i]]; // might want to slice here, except I don't think I actually want to copy, I want a reference.
 			}
-			else {
-				touched[key].n++;
-			}
-		}
-		function touchAlive(key){
-			if (touched[key] === undefined) { 
-				touched[key] = {n: 1, a: true};
-			}
-			else {
-				touched[key].n++;
-				touched[key].a = true;
-			}
+			return slicedOb;
 		}
 
-		for (let i = 0, len = top.length; i < len; i++) {
-			let key = top[i];
-			touchDead(key);
-			touchDead(key - 1);
-			touchDead(key + 1);
+		let numSlices = 2; // in future would be a config value. -> 1 results in "bottom is undefined"
+		if (navigator.hardwareConcurrency){
+			let numCores = navigator.hardwareConcurrency;
+			if (numSlices > numCores); // don't allow more threads than we really have available.
+				numSlices = (numCores - 1);
 		}
-		for (let i = 0, len = bottom.length; i < len; i++) {
-			let key = bottom[i];
-			touchDead(key);
-			touchDead(key - 1);
-			touchDead(key + 1);
+		let kLen = xKeys1.length;
+		if (kLen < 15) // don't bother dividing simple tasks.
+			numSices = 1;
+		let slice = Math.round(kLen / numSlices);
+		let upperSlice = kLen - slice * (numSlices - 1);
+
+		let slices = [];
+		// in order to get correct results, must include edge layers to each slice. This will create duplicate live cell results. This probably doesn't matter, may be most efficient to leave them in.
+		// this may need to be debugged to make sure we aren't duplicating too many layers (especially with a 2 split)
+		for (let i = 1; i <= numSlices; i++){
+			if (i == numSlices) // last slice
+				slices.push(getSlice((i - 1) * slice - 1, (i - 1) * slice + upperSlice));
+			else if (i == 1) // first slice
+				slices.push(getSlice((i - 1) * slice, i * slice + 1));
+			else
+				slices.push(getSlice((i - 1) * slice - 1, i * slice + 1));
 		}
-		for (let i = 0, len = middle.length; i < len; i++) {
-			let key = middle[i];
-			touchAlive(key);
-			touchDead(key - 1);
-			touchDead(key + 1);
+
+
+		function createWorker(i) {
+			return new Promise(function(resolve) {
+				var v = new Worker('scripts/stackStateThread.js');
+				v.postMessage(i);
+				v.onmessage = function(event){
+					resolve(event.data);
+				};
+			});
 		}
-		return touched;
+
+		var promises = [];
+		// "error handling shoud be provisioned with background workers" -> https://stackoverflow.com/questions/41423905/wait-for-several-web-workers-to-finish
+		for (i = 0; i < slices.length; i++){
+			// do worker task with slice.
+			promises.push(createWorker(slices[i]));
+		}
+		
+		Promise.all(promises)
+			.then(function(data) {
+				// `data` has the results, compute the final solution
+				// data will be an array arrays of arrays [[live matrix, killed matrix],...
+				let resultLiveMatrix = [[],[]];
+				let resultDeadMatrix = [[],[]];
+				for (let i = 0; i < data.length; i++) {
+					resultLiveMatrix[0] = resultLiveMatrix[0].concat(data[i][0][0]);
+					resultLiveMatrix[1] = resultLiveMatrix[1].concat(data[i][0][1]);
+					resultDeadMatrix[0] = resultDeadMatrix[0].concat(data[i][1][0]);
+					resultDeadMatrix[1] = resultDeadMatrix[1].concat(data[i][1][1]);
+				}
+
+				if (cfg.deadCellType) {
+					state.deadMatrices.unshift(resultDeadMatrix);
+					if (state.deadMatrices.length > cfg.killedFadeOut)
+						state.deadMatrices.pop();
+				}
+
+				state.matrix = resultLiveMatrix;
+				state.refreshMinMaxes();
+				
+				drawState();
+				stepDone = true;
+			});
 	}
 
-	r.tick("setup initial variables");
 
-	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
-	stack[-100000000] = [];
-	stack[-99999999] = [];
-	let xKeys = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
-	xKeys.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+	
+	// function layerResult(yarr){
+	// 	let top = yarr[0];
+	// 	let middle = yarr[1];
+	// 	let bottom = yarr[2];
 
-	let results = []; // array of arrays
-	let lenX = xKeys.length;
-	// setup x vars
-	let xTop = 100000000; // doesn't matter, will immediately be overwritten, and is empty anyway.
-	let xMiddle = 100000000;
-	let xBottom = 100000000; 
-	// setup y arrays
-	let yTop = [];
-	let yMiddle = [];
-	let yBottom = [];
-	let yt;
-	let yb;
+	// 	let touched = {};
 
-	r.tick('compute layers');
+	// 	function touchDead(key){
+	// 		if (touched[key] === undefined) { 
+	// 			touched[key] = {n: 1};
+	// 		}
+	// 		else {
+	// 			touched[key].n++;
+	// 		}
+	// 	}
+	// 	function touchAlive(key){
+	// 		if (touched[key] === undefined) { 
+	// 			touched[key] = {n: 1, a: true};
+	// 		}
+	// 		else {
+	// 			touched[key].n++;
+	// 			touched[key].a = true;
+	// 		}
+	// 	}
 
-	for (let i = 0; i < lenX; i++) {
-		// shift x numbers
-		xTop = xMiddle;
-		xMiddle = xBottom;
-		xBottom = Number(xKeys[i]); // this will always be lowest
-		// shift y layers
-		yTop = yMiddle;
-		yMiddle = yBottom;
-		yBottom = stack[xBottom];
+	// 	for (let i = 0, len = top.length; i < len; i++) {
+	// 		let key = top[i];
+	// 		touchDead(key);
+	// 		touchDead(key - 1);
+	// 		touchDead(key + 1);
+	// 	}
+	// 	for (let i = 0, len = bottom.length; i < len; i++) {
+	// 		let key = bottom[i];
+	// 		touchDead(key);
+	// 		touchDead(key - 1);
+	// 		touchDead(key + 1);
+	// 	}
+	// 	for (let i = 0, len = middle.length; i < len; i++) {
+	// 		let key = middle[i];
+	// 		touchAlive(key);
+	// 		touchDead(key - 1);
+	// 		touchDead(key + 1);
+	// 	}
+	// 	return touched;
+	// }
+
+	// r.tick("setup initial variables");
+
+	// // add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
+	// stack[-100000000] = [];
+	// stack[-99999999] = [];
+	// let xKeys = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
+	// xKeys.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+
+	// let results = []; // array of arrays
+	// let lenX = xKeys.length;
+	// // setup x vars
+	// let xTop = 100000000; // doesn't matter, will immediately be overwritten, and is empty anyway.
+	// let xMiddle = 100000000;
+	// let xBottom = 100000000; 
+	// // setup y arrays
+	// let yTop = [];
+	// let yMiddle = [];
+	// let yBottom = [];
+	// let yt;
+	// let yb;
+
+	// r.tick('compute layers');
+
+	// for (let i = 0; i < lenX; i++) {
+	// 	// shift x numbers
+	// 	xTop = xMiddle;
+	// 	xMiddle = xBottom;
+	// 	xBottom = Number(xKeys[i]); // this will always be lowest
+	// 	// shift y layers
+	// 	yTop = yMiddle;
+	// 	yMiddle = yBottom;
+	// 	yBottom = stack[xBottom];
 
 		
-		if (xTop != xMiddle + 1) {
-			if (xTop - 2 === xMiddle) { // "between" condition
-				results.push([xTop - 1, layerResult([yTop, [], yMiddle])]);
-			}				
-			else {// bottom / top condition
-				results.push([xMiddle + 1, layerResult([[], [], yMiddle])]);
+	// 	if (xTop != xMiddle + 1) {
+	// 		if (xTop - 2 === xMiddle) { // "between" condition
+	// 			results.push([xTop - 1, layerResult([yTop, [], yMiddle])]);
+	// 		}				
+	// 		else {// bottom / top condition
+	// 			results.push([xMiddle + 1, layerResult([[], [], yMiddle])]);
 
-				if (yTop.length != 0)
-					results.push([xTop - 1, layerResult([yTop, [], []])]);
-			}
-		}
+	// 			if (yTop.length != 0)
+	// 				results.push([xTop - 1, layerResult([yTop, [], []])]);
+	// 		}
+	// 	}
 
-		// do a middle layer
-		// if the layer ontop of us is 1 away, use it, else use empty
-		yt = (xMiddle + 1 === xTop)? yTop : [];
-		// if the layer below us is 1 away, use it else use empty
-		yb = (xMiddle - 1 === xBottom)? yBottom : [];
-		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
-	}
+	// 	// do a middle layer
+	// 	// if the layer ontop of us is 1 away, use it, else use empty
+	// 	yt = (xMiddle + 1 === xTop)? yTop : [];
+	// 	// if the layer below us is 1 away, use it else use empty
+	// 	yb = (xMiddle - 1 === xBottom)? yBottom : [];
+	// 	results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
+	// }
 
-	r.tick("compute results");
+	// r.tick("compute results");
 
-	const newState = new State();
-	let killedMatrix = [[],[]];
-	let x; // our x value
-	for (let i = 0, len = results.length; i < len; i++) {
-		x = results[i][0];
-		yResults = results[i][1];
-		for (let yKey in yResults) {
+	// const newState = new State();
+	// let killedMatrix = [[],[]];
+	// let x; // our x value
+	// for (let i = 0, len = results.length; i < len; i++) {
+	// 	x = results[i][0];
+	// 	yResults = results[i][1];
+	// 	for (let yKey in yResults) {
 			
-			y = Number(yKey);
-			if (yResults[yKey].n === 3 || (yResults[yKey].n === 4 && yResults[yKey].a)){
-				newState.push(x,y);
-			} else if (yResults[yKey].a) {
-				killedMatrix[0].push(x);
-				killedMatrix[1].push(y);
-			}
-		}
-	}
+	// 		y = Number(yKey);
+	// 		if (yResults[yKey].n === 3 || (yResults[yKey].n === 4 && yResults[yKey].a)){
+	// 			newState.push(x,y);
+	// 		} else if (yResults[yKey].a) {
+	// 			killedMatrix[0].push(x);
+	// 			killedMatrix[1].push(y);
+	// 		}
+	// 	}
+	// }
 	
 	
 
-	if (cfg.deadCellType) {
-		r.tick('update dead cells');
-		state.deadMatrices.unshift(killedMatrix);
-		if (state.deadMatrices.length > cfg.killedFadeOut)
-			state.deadMatrices.pop();
-	}
+	// if (cfg.deadCellType) {
+	// 	r.tick('update dead cells');
+	// 	state.deadMatrices.unshift(killedMatrix);
+	// 	if (state.deadMatrices.length > cfg.killedFadeOut)
+	// 		state.deadMatrices.pop();
+	// }
 
-	r.tick("update state");
+	// r.tick("update state");
 
-	state.matrix = newState.matrix;
-	state.minMaxes = newState.minMaxes;
+	// state.matrix = newState.matrix;
+	// state.minMaxes = newState.minMaxes;
 
-	if (steps > 1) {
-		return stackState(--steps, r); // repeat
-	}
+	// if (steps > 1) {
+	// 	return stackState(--steps, r); // repeat
+	// }
 
 }
 
@@ -1419,6 +1514,17 @@ let debugReport = new Perf("debugreport");
 /// given x,y's of currently living cells: apply game rules and output new x,y's of living cells
 function stepState(steps = 1) {
 
+	// if (cfg.enableUndo) {
+	// 	if (oldStates.length > cfg.maxUndo) {
+	// 		oldStates.shift();
+	// 	}
+	// 	let oldState = new State();
+	// 	oldState.init(state.matrix, state.comments);
+	// 	oldState.xShift = state.xShift;
+	// 	oldState.yShift = state.yShift;
+	// 	oldStates.push(oldState);
+    // }
+
 	// state.save(); let report2 = new Perf("maxStepper2") 
 	// maxStepper2(50, report2);
 	// report2.printResults();
@@ -1431,9 +1537,10 @@ function stepState(steps = 1) {
 
 	// state.reset();
 
-	// let report1 = new Perf("stackState");
-	// stackState(50, report1);
-	// report1.printResults();
+	let report1 = new Perf("stackState");
+	stackState(1, report1);
+	report1.tick('min maxes');
+	report1.printResults();
 
 	// state.reset();
 
@@ -1443,8 +1550,20 @@ function stepState(steps = 1) {
 
 	// state.reset();
 
+	// if (window.Worker) { // Check if Browser supports the Worker api.
+	// 	let ssThread = new Worker('scripts/stackStateThread.js');
+	// 	ssThread.postMessage(state.matrix)
 
-	stackState(steps, debugReport);
+	// 	ssThread.onmessage = (e) => { // I'm guessing this is asynchronous (end of call stack)
+	// 		let matrix = e.data;
+	// 		state.matrix = matrix;
+	// 		state.refreshMinMaxes();
+	// 		drawState();
+	// 	}
+	// }
+
+
+	//stackState(steps, debugReport);
 
 	if (steps > 1) {
 		return stepState(--steps); // repeat
