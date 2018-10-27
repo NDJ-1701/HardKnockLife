@@ -1,4 +1,4 @@
-function stackState(stack){
+function stackStateSlice(miniStack){
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -47,9 +47,9 @@ function stackState(stack){
 	}
 
 	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
-	stack[-100000000] = [];
-	stack[-99999999] = [];
-	let xKeys = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
+	miniStack[-100000000] = [];
+	miniStack[-99999999] = [];
+	let xKeys = Object.keys(miniStack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
 	xKeys.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
 
 	let results = []; // array of arrays
@@ -74,7 +74,7 @@ function stackState(stack){
 		// shift y layers
 		yTop = yMiddle;
 		yMiddle = yBottom;
-		yBottom = stack[xBottom];
+		yBottom = miniStack[xBottom];
 
 		
 		if (xTop != xMiddle + 1) {
@@ -120,7 +120,6 @@ function stackState(stack){
     return [newState, killedMatrix];
 }
 
-
 onmessage = function(e) {
-    postMessage(stackState(e.data));
+    postMessage(stackStateSlice(e.data));
 }

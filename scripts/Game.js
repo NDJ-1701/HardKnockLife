@@ -74,7 +74,7 @@ let cfg = {
 		outlineColor: 'lightgray',
 		// Currently the killedFadeOut system relies on this being an rgb value formated just like this, including whitespace
 		// I only changed this for fun, but would prefer it to be clear. Can't remember how.
-		outlineEnabled: false,
+		outlineEnabled: true,
 		outlineThick: 1 // 0 is not a valid input. Currently 1 to 5 is acceptable. Does not vary with cell size. used for husks and live cells.
 	},
 	gridEnabled: false,
@@ -154,6 +154,10 @@ let someXvalues = [
 	[-2, 3, 1, 2, 0, 5, -1, -20, -20, 12],
 	[ 0, 0, 0, 0, 0, 0,  0, -20, 0, 0]
 ];
+let someContiguousXvalues = [
+	[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+	[ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+];
 let gosperGliderGun = [
 	[14, 14, 15, 15, 24, 24, 24, 25, 26, 27, 25, 26, 27, 29, 30, 30, 30, 31, 29, 28, 34, 34, 34, 35, 35, 35, 36, 36, 38, 38, 38, 38, 48, 49, 49, 48],
 	[21, 22, 22, 21, 21, 22, 23, 20, 19, 19, 24, 25, 25, 24, 23, 22, 21, 22, 20, 22, 21, 20, 19, 19, 20, 21, 18, 22, 17, 18, 22, 23, 20, 20, 19, 19]
@@ -169,14 +173,14 @@ let variousInitialStateComments = `#N Various Initial States <br>
 #O NaOH <br>
 #C Includes gosper glider gun, figure 8 oscillator, and pulsar.`;
 let variousInitialState = [
-	[13,  13,  13,  13,  13,  13,  14,  14,  15,  15,  15,  15,  15,  15,  16,  16,  16,  16,  17,  17,  17,  17,  18,  18,  18,  18,  18,  18,  20,  20,  20,  20,  20,  20,  21,  21,  21,  21,  22,  22,  22,  22,  23,  23,  23,  23,  24,  24,  24,  24,  24,  25,  25,  25,  25,  25,  25,  26,  26,  28,  28,  28,  28,  29,  35,  36,  36,  36,  36,  36,  37,  37,  37,  37,  39,  39,  40,  40,  40,  40,  43,  44,  44,  45,  45,  46,  47,  48,  48,  49,  49,  62,  62,  62,  63,  63,  63,  64,  64,  64,  65,  65,  65,  66,  66,  66,  66,  66,  67,  67,  67,  67,  67,  68,  68,  69,  69,  70,  70,  71,  71,  72,  72,  73,  73,  74,  74],
-	[41, 42, 43, 47, 48, 49, 21, 22, 21, 22, 39, 44, 46, 51, 39, 44, 46, 51, 39, 44, 46, 51, 41, 42, 43, 47, 48, 49, 41, 42, 43, 47, 48, 49, 39, 44, 46, 51, 39, 44, 46, 51, 39, 44, 46, 51, 19, 20, 22, 24, 25, 41, 42, 43, 47, 48, 49, 19, 25, 20, 21, 23, 24, 22, 25, 19, 20, 21, 26, 27, 18, 22, 25, 26, 17, 23, 17, 18, 22, 23, 20, 19, 21, 19, 21, 21, 21, 18, 21, 19, 20, 7, 8, 9, 7, 8, 9, 7, 8, 9, 10, 11, 12, 10, 11, 12, 38, 39, 10, 11, 12, 36, 41, 35, 42, 34, 43, 34, 43, 34, 43, 35, 42, 36, 41, 38, 39 ]
+	[14, 14, 15, 15, 24, 24, 26, 28, 28, 24, 24, 28, 28, 24, 26, 29, 35, 37, 37, 36, 36, 39, 40, 37, 40, 36, 36, 36, 37, 40, 39, 40, 44, 44, 48, 46, 47, 48, 45, 43, 45, 49, 49, 16, 15, 17, 18, 18, 18, 15, 16, 17, 13, 13, 13, 21, 23, 22, 20, 20, 20, 21, 22, 23, 25, 25, 25, 15, 17, 16, 18, 18, 18, 13, 13, 13, 15, 16, 17, 22, 20, 21, 23, 20, 20, 25, 25, 25, 21, 22, 23, 69, 70, 68, 71, 72, 67, 66, 73, 74, 66, 74, 67, 73, 68, 72, 69, 70, 71, 63, 62, 63, 62, 64, 64, 62, 63, 64, 65, 66, 67, 65, 65, 67, 66, 67, 66],
+	[21, 22, 22, 21, 20, 19, 19, 20, 21, 22, 24, 23, 24, 25, 25, 22, 25, 25, 26, 27, 26, 17, 18, 18, 17, 19, 20, 21, 22, 22, 23, 23, 19, 21, 18, 21, 21, 21, 19, 20, 21, 19, 20, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 43, 42, 39, 39, 39, 41, 42, 43, 44, 44, 44, 41, 42, 43, 46, 46, 46, 48, 47, 49, 47, 49, 48, 51, 51, 51, 46, 47, 46, 46, 49, 48, 47, 48, 49, 51, 51, 51, 34, 34, 35, 34, 35, 36, 38, 36, 38, 39, 39, 41, 41, 42, 42, 43, 43, 43, 7, 8, 8, 7, 7, 8, 9, 9, 9, 10, 10, 10, 11, 12, 11, 12, 12, 11]
 ];
 
 //// our main state object and prototype
 
 let initialSetupComments = variousInitialStateComments;
-let initialSetup = variousInitialState;
+let initialSetup = gosperGliderGun;
 
 const StateProtoType = {
 	privateCellSize: cfg.initialCellSize,
@@ -391,6 +395,7 @@ function addCellAtCursorPosition(event) {
 	let m = {}; // will contain an x and y cell location
 	getMouseCoordinate(event, m);
 	let index = paraInd(m.x - state.xShift, m.y - state.yShift, state.x, state.y); // check if cell exists in state matrix
+	console.log('cell clicked at ', m.x - state.xShift, m.y - state.yShift);
 	if (index === -1) { // if not found, add the cell to the state
 		state.push(m.x - state.xShift, m.y - state.yShift);
 	} else { // if found, delete the cell
@@ -785,8 +790,8 @@ function refreshTime() {
 function drawRecursively() {
 	if (running) {
 		//console.timeEnd("draw");
-		if (stepDone)	
-			drawState();
+		//if (stepDone)	
+			//drawState();
 		window.setTimeout(drawRecursively, refreshTime()); // this line allows the tickrate to be re-evaluated.
 		//console.time("draw");
 	}
@@ -1092,20 +1097,25 @@ const perfProto = {
 		let accumulator = {}; // get accumulated milliseconds per named item
 		let totalTime = 0;
 		let recursions = 0;
-		for (let i = 0, len = perfMap.length - 1; i < len; i++){
+		for (let i = 0, len = perfMap.length - 1; i < len; i++){ // notice we are skipping last element, because that represents the end time of the last tick, not a new tick.
 			originalOrder.push(perfMap[i][1]);
 			if (accumulator[perfMap[i][1]] === undefined)
 				accumulator[perfMap[i][1]] = 0;
 			let stepTime = perfMap[i + 1][0] - perfMap[i][0]
 			accumulator[perfMap[i][1]] += stepTime;
 			totalTime += stepTime;
-			if (perfMap[i][1] === perfMap[0][1]) // will give bad results if ticks are given identical names.
+			if (perfMap[i][1] === perfMap[0][1]) // will give bad results if ticks are given identical name to first tick. Only detects full recursion from first tick.
 				recursions++;
 		}
 
+		// remove duplicates from key order so we don't print results more than once (some ticks loop when others don't).
+		originalOrder = originalOrder.filter((item, pos) => {
+			return originalOrder.indexOf(item) == pos;
+		});
+
 		console.log("--==== Performance Report ====-- " + this.reportName);
-		let iKeys = Object.keys(accumulator).length;
-		for (let i = 0; i < iKeys; i++) {
+		iKeysLength = originalOrder.length;
+		for (let i = 0; i < iKeysLength; i++) {
 			let stepName = originalOrder[i];
 			let stepLengthMS = accumulator[stepName];			
 			stepLengthPercent = (Math.round(stepLengthMS/total * 100 * 100) / 100);
@@ -1133,9 +1143,203 @@ function Perf (reportName = ""){
 /// end performance auditing tools.
 
 
+function stackStateSlice(sliceOb, r){
+	let miniStack = sliceOb[0];
+	let ignores = sliceOb[1][0];
+	let ignoreType = sliceOb[1][1]; 
+	//console.log('ministack json', JSON.stringify(miniStack));
+
+	// if lower ignore, and lower is not contiguous with a ignore+1 in ministack, then get rid of lower because it's trash.
+	// if upper ignore, and upper is not contiguous with an ignore-1 in ministack, then get rid of upper
+	// if middle, then apply both conditions.
+
+	// if (ignoreType != 0){
+	// 	console.log('removing deletions');
+	// 	if (ignoreType == 1){ // remove upper num & +1
+	// 		console.log('removing lower', ignores[0], ignores[0] + 1);
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] + 1];
+	// 	}
+	// 	else if (ignoreType == 3){ // remove lower num & -1
+	// 		console.log('removing upper', ignores[0], ignores[0] - 1);
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] - 1];
+	// 	}
+	// 	else if (ignoreType == 2) { // remove both
+	// 		console.log('removing upper and lower');
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] - 1];
+	// 		delete results[ignores[1]];
+	// 		delete results[ignores[1] + 1];
+	// 	}
+	// }
+	// else
+	// 	console.log('no deletions');
+
+	// the extra ignores should probably be added where they are initially created.
+	// console.log('ignores before:', ...ignores);
+	// if (ignoreType != 0){
+	// 	console.log('computing deletions');
+	// 	if (ignoreType == 1){ // remove upper num & +1
+	// 		ignores.push(ignores[0] + 1);
+	// 	}
+	// 	else if (ignoreType == 3){ // remove lower num & -1
+	// 		ignores.push(ignores[0] - 1);
+	// 	}
+	// 	else if (ignoreType == 2) { // remove both
+	// 		ignores.push(ignores[0] - 1);
+	// 		ignores.push(ignores[1] + 1);
+	// 	}
+	// }
+	// else
+	// 	console.log('no deletions');
+	// console.log('ignores after', ...ignores);
+
+	// an optimization could be to only deliver ministacks where there are 2 row gaps between x values. No upper/lower duplicate removal would be necessary.
+	
+	function layerResult(yarr){
+		let top = yarr[0];
+		let middle = yarr[1];
+		let bottom = yarr[2];
+
+		let touched = {};
+
+		function touchDead(key){
+			if (touched[key] === undefined) { 
+				touched[key] = {n: 1};
+			}
+			else {
+				touched[key].n++;
+			}
+		}
+		function touchAlive(key){
+			if (touched[key] === undefined) { 
+				touched[key] = {n: 1, a: true};
+			}
+			else {
+				touched[key].n++;
+				touched[key].a = true;
+			}
+		}
+
+		for (let i = 0, len = top.length; i < len; i++) {
+			let key = top[i];
+			touchDead(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+		for (let i = 0, len = bottom.length; i < len; i++) {
+			let key = bottom[i];
+			touchDead(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+		for (let i = 0, len = middle.length; i < len; i++) {
+			let key = middle[i];
+			touchAlive(key);
+			touchDead(key - 1);
+			touchDead(key + 1);
+		}
+
+		return touched;
+	}
+
+	r.tick('setup slice');
+
+	// add empty arrays to end of stack to make iteration easier. This means we're limited to some number of trillions of rows before breaking.
+	miniStack[-100000000] = [];
+	miniStack[-99999999] = [];
+	let xKeys = Object.keys(miniStack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
+	xKeys.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+
+	let results = []; // array of arrays
+	let lenX = xKeys.length;
+	// setup x vars
+	let xTop = 100000000; // doesn't matter, will immediately be overwritten, and is empty anyway.
+	let xMiddle = 100000000;
+	let xBottom = 100000000; 
+	// setup y arrays
+	let yTop = [];
+	let yMiddle = [];
+	let yBottom = [];
+	let yt;
+	let yb;
+
+	r.tick('process slice layers');
+
+	for (let i = 0; i < lenX; i++) {
+		// shift x numbers
+		xTop = xMiddle;
+		xMiddle = xBottom;
+		xBottom = Number(xKeys[i]); // this will always be lowest
+		// shift y layers
+		yTop = yMiddle;
+		yMiddle = yBottom;
+		yBottom = miniStack[xBottom];
+
+		
+		if (xTop != xMiddle + 1) {
+			if (xTop - 2 === xMiddle) { // "between" condition
+				results.push([xTop - 1, layerResult([yTop, [], yMiddle])]);
+			}				
+			else {// bottom / top condition
+				results.push([xMiddle + 1, layerResult([[], [], yMiddle])]);
+
+				if (yTop.length != 0)
+					results.push([xTop - 1, layerResult([yTop, [], []])]);
+			}
+		}
+
+		// do a middle layer
+		// if the layer ontop of us is 1 away, use it, else use empty
+		yt = (xMiddle + 1 === xTop)? yTop : [];
+		// if the layer below us is 1 away, use it else use empty
+		yb = (xMiddle - 1 === xBottom)? yBottom : [];
+		results.push([xMiddle, layerResult([yt, yMiddle, yb])]);
+	}
+
+	r.tick('compute results');
+
+    // const newState = new State();
+    let newState = [[],[]];
+	let killedMatrix = [[],[]];
+	let x; // our x value
+	for (let i = 0, len = results.length; i < len; i++) {
+		//console.log('processing results property', results[i]);
+		x = results[i][0];
+		if (ignores.includes(x)) {
+			continue;
+		}
+		yResults = results[i][1];
+		for (let yKey in yResults) {
+			y = Number(yKey);
+			if (yResults[yKey].n === 3 || (yResults[yKey].n === 4 && yResults[yKey].a)){
+                newState[0].push(x);
+				newState[1].push(y);
+				//newState.push(x,y);
+			} else if (yResults[yKey].a) {
+				killedMatrix[0].push(x);
+				killedMatrix[1].push(y);
+			}
+		}
+	}
+	
+	r.tick('return results');
+
+    return [newState, killedMatrix];
+}
 
 
 let stepDone = true;
+let numSlices = 2;
+let workers = [];
+if (false){ //window.Worker) {
+	for (let i = 0; i < numSlices; i++) {
+		var v = new Worker('scripts/stackStateThread.js');
+		workers.push(v);
+	}
+}
+
 function stackState(steps, r){
 	stepDone = false;
 	r.tick('update undo');
@@ -1168,63 +1372,113 @@ function stackState(steps, r){
 	r.tick('get and sort keys');
 
 	let xKeys1 = Object.keys(stack); // refresh now that we have two new elements. Is this costly? Should we have just modified the xKeys array?
-	xKeys1.sort(function(a, b){return b - a}); // sort because object properties are in a particular order but not a helpful one.
+	xKeys1.sort(function(a, b){return a - b}); // sort because object properties are in a particular order but not a helpful one.
 
-	if (window.Worker) { // Check if Browser supports the Worker api.
+	if (true /*window.Worker*/) { // Check if Browser supports the Worker api. (chrome doesn't allow local web worker file access, test with firefox or use a local "blob")
 		r.tick('sort stack');
 
-		function getSlice(lowerBound, upperBound){
+		function getSlice(lowerBound, upperBound, ignoreType){ // ignoretype: 0 = none, 1 = beginning, 2 = middle, 3 = end
 			let slicedOb = {};
-			for (i = lowerBound; i < upperBound; i++){
+			for (i = lowerBound; i <= upperBound; i++){
 				slicedOb[xKeys1[i]] = stack[xKeys1[i]]; // might want to slice here, except I don't think I actually want to copy, I want a reference.
 			}
-			return slicedOb;
+			let ignores = [];
+
+			// if lower ignore, and lower is not contiguous with a ignore+1 in ministack, then get rid of lower because it's trash.
+			// if upper ignore, and upper is not contiguous with an ignore-1 in ministack, then get rid of upper
+			// if middle, then apply both conditions.
+			if (ignoreType != 0){
+				if (ignoreType === 1 || ignoreType === 2){ // first slice or middle slice
+					ignores.push(Number(xKeys1[upperBound]));
+					ignores.push(Number(xKeys1[upperBound]) + 1);
+					
+				}
+				if (ignoreType === 3 || ignoreType === 2){ //last slice or middle slice
+					ignores.push(Number(xKeys1[lowerBound]));
+					ignores.push(Number(xKeys1[lowerBound]) - 1);
+				}
+			}
+			return [slicedOb,[ignores, ignoreType]];
 		}
 
-		let numSlices = 2; // in future would be a config value. -> 1 results in "bottom is undefined"
+		r.tick('setup slices');
+
+		//let numSlices = 4; // in future would be a config value. -> 1 results in "bottom is undefined"
 		if (navigator.hardwareConcurrency){
 			let numCores = navigator.hardwareConcurrency;
-			if (numSlices > numCores); // don't allow more threads than we really have available.
+			if (numSlices > numCores) // don't allow more threads than we really have available.
 				numSlices = (numCores - 1);
 		}
 		let kLen = xKeys1.length;
 		if (kLen < 15) // don't bother dividing simple tasks.
-			numSices = 1;
-		let slice = Math.round(kLen / numSlices);
-		let upperSlice = kLen - slice * (numSlices - 1);
+			numSlices = 1;
+		let sliceCount = Math.round(kLen / numSlices);
 
-		let slices = [];
-		// in order to get correct results, must include edge layers to each slice. This will create duplicate live cell results. This probably doesn't matter, may be most efficient to leave them in.
-		// this may need to be debugged to make sure we aren't duplicating too many layers (especially with a 2 split)
-		for (let i = 1; i <= numSlices; i++){
-			if (i == numSlices) // last slice
-				slices.push(getSlice((i - 1) * slice - 1, (i - 1) * slice + upperSlice));
-			else if (i == 1) // first slice
-				slices.push(getSlice((i - 1) * slice, i * slice + 1));
-			else
-				slices.push(getSlice((i - 1) * slice - 1, i * slice + 1));
+		let slices = []; // will contain [sliceobj, [nums to ignore]]
+		// in order to get correct results, must include edge layers to each slice. This will create duplicate live cell results.
+
+		if (numSlices == 1){ // if only one slice
+			slices.push(getSlice(0, kLen - 1, 0));
+		}
+		else {
+			let bottom = 0;
+			let upperIndex;
+			for (let i = 0; i < kLen; i++) {
+				upperIndex = i + sliceCount - 1;
+
+				if (upperIndex >= kLen - 1) { //we've reached the end 
+					//slices.push(getSlice(bottom, kLen - 1, 3));
+					slices.push(getSlice(bottom - 1, kLen - 1, 3)); // one less from bottom because we need that layer for bottom layer results
+					break;
+				}
+				
+				if (Number(xKeys1[upperIndex]) + 1 == Number(xKeys1[upperIndex + 1]) && Number(xKeys1[upperIndex + 1]) + 1 == Number(xKeys1[upperIndex + 2])) {
+					if (bottom === 0) { // first slice
+						//slices.push(getSlice(bottom, upperIndex, 1));
+						slices.push(getSlice(bottom, upperIndex + 1, 1));
+					}						
+					else { // middle slice
+						//slices.push(getSlice(bottom, upperIndex, 2));
+						slices.push(getSlice(bottom - 1, upperIndex + 1, 2));
+					}					
+					i = upperIndex;
+					bottom = i + 1;
+				}
+			}
 		}
 
+		r.tick('message to workers');
 
-		function createWorker(i) {
-			return new Promise(function(resolve) {
-				var v = new Worker('scripts/stackStateThread.js');
-				v.postMessage(i);
-				v.onmessage = function(event){
-					resolve(event.data);
-				};
-			});
-		}
+		// function createWorker(slice, i) {
+		// 	return new Promise(function(resolve/*, reject*/) {
+		// 		//var v = new Worker('scripts/stackStateThread.js');
+				
+		// 		// let v = workers[i];
+		// 		// v.postMessage(slice);
+		// 		// v.onmessage = function(event){
+		// 		// 	resolve(event.data);
+		// 		// };
+		// 		// v.onerror = (event) => {
+		// 		// 	reject(event);
+		// 		// }
 
-		var promises = [];
+		// 		resolve(stackStateSlice(slice,r));
+		// 	});
+		// }
+
+		let promises = [];
+		let data = [];
 		// "error handling shoud be provisioned with background workers" -> https://stackoverflow.com/questions/41423905/wait-for-several-web-workers-to-finish
-		for (i = 0; i < slices.length; i++){
+		for (let i = 0; i < slices.length; i++){
 			// do worker task with slice.
-			promises.push(createWorker(slices[i]));
+			//promises.push(createWorker(slices[i],i));
+			data.push(stackStateSlice(slices[i],r));
 		}
 		
-		Promise.all(promises)
-			.then(function(data) {
+		// Promise.all(promises)
+		// 	.then(function(data) {
+
+				r.tick('process worker results');
 				// `data` has the results, compute the final solution
 				// data will be an array arrays of arrays [[live matrix, killed matrix],...
 				let resultLiveMatrix = [[],[]];
@@ -1242,12 +1496,18 @@ function stackState(steps, r){
 						state.deadMatrices.pop();
 				}
 
+				r.tick('update state');
+
 				state.matrix = resultLiveMatrix;
 				state.refreshMinMaxes();
 				
-				drawState();
 				stepDone = true;
-			});
+				r.printResults();
+				drawState();
+			// })
+			// .catch(function(error) {
+			// 	console.log('Web worker returned error: '+ error.message, '\n\t    Error on line: ' + error.lineno );
+			// });
 	}
 
 
@@ -1389,7 +1649,7 @@ function stackState(steps, r){
 	// if (steps > 1) {
 	// 	return stackState(--steps, r); // repeat
 	// }
-
+	console.log('//////////////////////////////////////////////////////////////////////////state computation done');
 }
 
 function maxStepperOneBigObject(steps = 1, r){
@@ -1538,8 +1798,9 @@ function stepState(steps = 1) {
 	// state.reset();
 
 	let report1 = new Perf("stackState");
-	stackState(1, report1);
-	report1.tick('min maxes');
+	stackState(50, report1);
+
+	//report1.tick('min maxes');
 	report1.printResults();
 
 	// state.reset();
