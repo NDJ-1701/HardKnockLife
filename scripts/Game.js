@@ -31,7 +31,9 @@ enhancements:
         
     a tool tip should be used when dragging to indicate where dragging is going to. If it's possible to shift canvas, that would be the thing to do.
 
-    a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
+	a config button should be added for persistant husks/shadows, killed faded out needs to be audited/enhanced (especially with regards to husks, not sure it does anything)
+	
+	husks/shadow should only change the ctx style once for each generation change, instead of once per cell.
 
     the ability to rewind/undo should be a toggle, as it is probably resource intensive.
 
@@ -1454,8 +1456,6 @@ function stackState(steps, r){
 		}
 
 		r.tick('message to workers');
-
-		console.log('workers length', workers.length);
 
 		function createWorker(slice, i) {
 			return new Promise(function(resolve, reject) {
