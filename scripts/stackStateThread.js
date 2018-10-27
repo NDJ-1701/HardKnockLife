@@ -1,4 +1,56 @@
-function stackStateSlice(miniStack){
+function stackStateSlice(sliceOb){
+	let miniStack = sliceOb[0];
+	let ignores = sliceOb[1][0];
+	let ignoreType = sliceOb[1][1]; 
+	//console.log('ministack json', JSON.stringify(miniStack));
+
+	// if lower ignore, and lower is not contiguous with a ignore+1 in ministack, then get rid of lower because it's trash.
+	// if upper ignore, and upper is not contiguous with an ignore-1 in ministack, then get rid of upper
+	// if middle, then apply both conditions.
+
+	// if (ignoreType != 0){
+	// 	console.log('removing deletions');
+	// 	if (ignoreType == 1){ // remove upper num & +1
+	// 		console.log('removing lower', ignores[0], ignores[0] + 1);
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] + 1];
+	// 	}
+	// 	else if (ignoreType == 3){ // remove lower num & -1
+	// 		console.log('removing upper', ignores[0], ignores[0] - 1);
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] - 1];
+	// 	}
+	// 	else if (ignoreType == 2) { // remove both
+	// 		console.log('removing upper and lower');
+	// 		delete results[ignores[0]];
+	// 		delete results[ignores[0] - 1];
+	// 		delete results[ignores[1]];
+	// 		delete results[ignores[1] + 1];
+	// 	}
+	// }
+	// else
+	// 	console.log('no deletions');
+
+	// the extra ignores should probably be added where they are initially created.
+	// console.log('ignores before:', ...ignores);
+	// if (ignoreType != 0){
+	// 	console.log('computing deletions');
+	// 	if (ignoreType == 1){ // remove upper num & +1
+	// 		ignores.push(ignores[0] + 1);
+	// 	}
+	// 	else if (ignoreType == 3){ // remove lower num & -1
+	// 		ignores.push(ignores[0] - 1);
+	// 	}
+	// 	else if (ignoreType == 2) { // remove both
+	// 		ignores.push(ignores[0] - 1);
+	// 		ignores.push(ignores[1] + 1);
+	// 	}
+	// }
+	// else
+	// 	console.log('no deletions');
+	// console.log('ignores after', ...ignores);
+
+	// an optimization could be to only deliver ministacks where there are 2 row gaps between x values. No upper/lower duplicate removal would be necessary.
 	
 	function layerResult(yarr){
 		let top = yarr[0];
@@ -43,6 +95,7 @@ function stackStateSlice(miniStack){
 			touchDead(key - 1);
 			touchDead(key + 1);
 		}
+
 		return touched;
 	}
 
@@ -64,7 +117,6 @@ function stackStateSlice(miniStack){
 	let yBottom = [];
 	let yt;
 	let yb;
-
 
 	for (let i = 0; i < lenX; i++) {
 		// shift x numbers
@@ -102,10 +154,13 @@ function stackStateSlice(miniStack){
 	let killedMatrix = [[],[]];
 	let x; // our x value
 	for (let i = 0, len = results.length; i < len; i++) {
+		//console.log('processing results property', results[i]);
 		x = results[i][0];
+		if (ignores.includes(x)) {
+			continue;
+		}
 		yResults = results[i][1];
 		for (let yKey in yResults) {
-			
 			y = Number(yKey);
 			if (yResults[yKey].n === 3 || (yResults[yKey].n === 4 && yResults[yKey].a)){
                 newState[0].push(x);
@@ -116,7 +171,9 @@ function stackStateSlice(miniStack){
 				killedMatrix[1].push(y);
 			}
 		}
-    }
+	}
+	
+
     return [newState, killedMatrix];
 }
 
