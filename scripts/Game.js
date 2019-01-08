@@ -10,6 +10,9 @@ questions / comments:
 	I'd like an explanation why we are using JSON for saving the state.
 
 enhancements:
+	https://www.desmos.com/calculator
+	the above site is a good example of what the game of life should look/behave like
+
 	asychronicity of stepstate and drawstate in the run function should be researched and improved. Drawing should happen at the tickrate or framerate: it seems like it's waiting for a new stepstate to complete
 	and I don't know why.
 
